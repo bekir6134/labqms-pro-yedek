@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+
+    <meta charset="UTF-8"> <script>
+    // GÜVENLİK KONTROLÜ: Kullanıcı giriş yapmış mı?
+    const aktifKullanici = localStorage.getItem("labqms_user");
+    if (!aktifKullanici) {
+        // Eğer giriş yapmamışsa, anında login sayfasına şutla!
+        window.location.href = "login.html";
+    }
+    </script>
+
+    
+    <title>Sistem Ayarları</title>
+    <title>Personel Yönetimi - LabQMS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary:#1E40AF; --border:#e2e8f0; --bg:#f8fafc; --success:#10B981; --danger:#ef4444; }
+        body { font-family:'Inter',sans-serif; background:var(--bg); margin:0; padding:24px; color:#334155; }
+        
+        .card { background:#fff; padding:25px; border-radius:12px; border:1px solid var(--border); margin-bottom:20px; box-shadow:0 4px 6px rgba(0,0,0,0.05); }
+        .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+        
+        h2 { margin-top:0; color:var(--primary); font-size: 1.4rem; margin-bottom: 20px;}
+        h3 { font-size:1.1rem; color:var(--primary); margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px; }
+        
+        label { display:block; font-size:0.85rem; font-weight:600; color:#64748b; margin-bottom:5px; }
+        input[type="text"], input[type="password"] { width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; box-sizing:border-box; outline:none; transition:0.2s; font-family:inherit;}
+        input[type="text"]:focus, input[type="password"]:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(30,64,175,0.1); }
+        
+        .role-box { background:#f8fafc; padding:15px; border-radius:8px; border:1px solid var(--border); }
+        .check-label { display:flex; gap:10px; align-items:center; cursor:pointer; font-weight:500; margin-bottom:10px; color:#334155; }
+        
+        .btn { background:var(--primary); color:white; padding:12px 20px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; width:100%; margin-top:20px; transition:0.2s;}
+        .btn:hover { background:#1e3a8a; }
+
+        /* ARAMA ÇUBUĞU VE TABLO */
+        .search-box { margin-bottom: 15px; display:flex; justify-content:flex-end; }
+        .search-box input { width: 300px; padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); outline: none; transition: 0.2s; }
+        .search-box input:focus { border-color: var(--primary); }
+
+        table { width:100%; border-collapse:collapse; margin-top:10px; }
+        th { background:#f8fafc; text-align:left; padding:12px; border-bottom:2px solid var(--border); color:#64748b; font-size:0.85rem; }
+        td { padding:12px; border-bottom:1px solid var(--border); font-size:0.9rem; vertical-align:middle; }
+        
+        .btn-edit { background:#e0e7ff; color:#4338ca; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.8rem; font-weight:600; margin-right:5px; }
+        .btn-del { background:#fee2e2; color:var(--danger); border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.8rem; font-weight:600; }
+        
+        .badge-role { display:inline-block; padding:3px 8px; background:#e0e7ff; color:#4338ca; border-radius:12px; font-size:0.75rem; font-weight:600; margin:2px; }
+        .badge-star { background:#fef9c3; color:#854d0e; }
+
+        /* TOAST BİLDİRİMİ */
+        #toast { visibility:hidden; min-width:260px; background-color:var(--success); color:#fff; text-align:center; border-radius:8px; padding:16px; position:fixed; z-index:9999; right:30px; top:30px; font-weight:600; box-shadow:0 4px 12px rgba(0,0,0,0.15); opacity:0; transition:opacity 0.3s, top 0.3s; }
+        #toast.show { visibility:visible; opacity:1; top:40px; }
+        #toast.error { background-color:var(--danger); }
+    </style>
+</head>
+<body>
+
+    <div id="toast"></div>
+
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2 id="formBaslik">➕ Yeni Personel Ekle</h2>
+            <button onclick="formSifirla()" style="background:none; border:none; color:#64748b; cursor:pointer; font-weight:600; text-decoration:underline;">Temizle / Yeni Kayıt</button>
+        </div>
+        
+        <form id="personelForm">
+            <input type="hidden" id="duzenle_id">
+            <div class="grid">
+                <div>
+                    <h3>Kimlik ve Giriş Bilgileri</h3>
+                    <div style="margin-bottom:15px;">
+                        <label>Ad Soyad</label>
+                        <input type="text" id="ad_soyad" placeholder="Örn: Ahmet Yılmaz" required autocomplete="off">
+                    </div>
+                    <div style="margin-bottom:15px;">
+                        <label>Kullanıcı Adı (Giriş İçin)</label>
+                        <input type="text" id="kullanici_adi" placeholder="Örn: ahmetyilmaz" required autocomplete="off">
+                    </div>
+                    <div style="margin-bottom:15px;">
+                        <label>Şifre</label>
+                        <input type="password" id="sifre" placeholder="Sisteme giriş şifresi" required>
+                    </div>
+                </div>
+
+                <div>
+                    <h3>Sertifika & İşlem Rolleri</h3>
+                    <div class="role-box">
+                        <label class="check-label" style="color:var(--primary);">
+                            <input type="checkbox" id="rol_olcum" value="olcum" checked> Ölçüm Yapan Personel (Operatör)
+                        </label>
+                        <label class="check-label" style="color:#9d174d;">
+                            <input type="checkbox" id="rol_onay" value="onay" onchange="document.getElementById('varsayilan_kutu').style.display = this.checked ? 'block' : 'none'"> 
+                            Onaylayan Personel (İmzacı)
+                        </label>
+                        
+                        <div id="varsayilan_kutu" style="display:none; margin-left: 25px; margin-top: 5px; padding: 10px; background: #fff; border-radius: 6px; border:1px solid #fef08a;">
+                            <label class="check-label" style="color:#854d0e; margin:0;">
+                                <input type="checkbox" id="varsayilan_onaylayici"> 🌟 Sertifikalarda Varsayılan Onaylayıcı Yap
+                            </label>
+                        </div>
+                    </div>
+
+                    <h3 style="margin-top:20px;">Menü Erişim Yetkileri</h3>
+                    <div class="role-box" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <label class="check-label"><input type="checkbox" class="erisim" value="kabul" checked> Cihaz Kabul</label>
+                        <label class="check-label"><input type="checkbox" class="erisim" value="operasyon" checked> Operasyon</label>
+                        <label class="check-label"><input type="checkbox" class="erisim" value="teklif"> Teklif Modülü</label>
+                        <label class="check-label"><input type="checkbox" class="erisim" value="ayarlar"> Ayarlar & Tanımlar</label>
+                    </div>
+                </div>
+            </div>
+            <button type="submit" id="submitBtn" class="btn">💾 Personeli Sisteme Kaydet</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+            <h2 style="margin:0;">👥 Kayıtlı Personeller ve Kullanıcılar</h2>
+            <div class="search-box">
+                <input type="text" id="aramaKutusu" oninput="personelAra()" placeholder="🔍 Ad Soyad veya Kullanıcı Adı ara...">
+            </div>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Ad Soyad</th>
+                    <th>Kullanıcı Adı</th>
+                    <th>Sertifika Rolleri</th>
+                    <th style="text-align:right;">İşlem</th>
+                </tr>
+            </thead>
+            <tbody id="personelListesi">
+                <tr><td colspan="4" style="text-align:center;">Yükleniyor...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        let tumPersoneller = [];
+
+        // --- TOAST BİLDİRİM FONKSİYONU ---
+        function showToast(msg, isError = false) {
+            const t = document.getElementById("toast");
+            t.textContent = msg;
+            t.className = isError ? "show error" : "show";
+            setTimeout(() => t.className = t.className.replace("show", ""), 3000);
+        }
+
+        async function personelleriGetir() {
+            try {
+                const res = await fetch('/api/personeller');
+                tumPersoneller = await res.json();
+                tabloCiz(tumPersoneller);
+            } catch (err) { console.error(err); }
+        }
+
+        // --- TABLO ÇİZİMİ ---
+        function tabloCiz(liste) {
+            const tbody = document.getElementById("personelListesi");
+            tbody.innerHTML = "";
+
+            if(liste.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#94a3b8; padding:20px;">Kayıt bulunamadı.</td></tr>`;
+                return;
+            }
+
+            liste.forEach(p => {
+                let rollerHtml = "";
+                const roller = p.roller || [];
+                if(roller.includes("olcum")) rollerHtml += `<span class="badge-role">🔬 Ölçümcü</span>`;
+                if(roller.includes("onay")) rollerHtml += `<span class="badge-role" style="background:#fce7f3; color:#9d174d;">✍️ Onaylayıcı</span>`;
+                if(p.varsayilan_onaylayici) rollerHtml += `<span class="badge-role badge-star">🌟 Varsayılan İmza</span>`;
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td><b>${p.ad_soyad}</b></td>
+                        <td><span style="background:#f1f5f9; padding:4px 8px; border-radius:6px; font-family:monospace;">${p.kullanici_adi}</span></td>
+                        <td>${rollerHtml || '-'}</td>
+                        <td style="text-align:right;">
+                            <button class="btn-edit" onclick="personelDuzenle(${p.id})">✏️ Düzenle</button>
+                            <button class="btn-del" onclick="personelSil(${p.id})">🗑️ Sil</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // --- ARAMA FONKSİYONU ---
+        function personelAra() {
+            const metin = document.getElementById("aramaKutusu").value.toLocaleUpperCase('tr-TR');
+            const filtrelenmis = tumPersoneller.filter(p => 
+                (p.ad_soyad || "").toLocaleUpperCase('tr-TR').includes(metin) ||
+                (p.kullanici_adi || "").toLocaleUpperCase('tr-TR').includes(metin)
+            );
+            tabloCiz(filtrelenmis);
+        }
+
+        // --- DÜZENLEME MODUNA GEÇİŞ ---
+        function personelDuzenle(id) {
+            const p = tumPersoneller.find(x => x.id === id);
+            if(!p) return;
+
+            document.getElementById("formBaslik").innerHTML = "✏️ Personel Düzenle";
+            document.getElementById("submitBtn").innerHTML = "💾 Değişiklikleri Güncelle";
+            document.getElementById("submitBtn").style.background = "#f59e0b"; // Turuncu
+
+            document.getElementById("duzenle_id").value = p.id;
+            document.getElementById("ad_soyad").value = p.ad_soyad;
+            document.getElementById("kullanici_adi").value = p.kullanici_adi;
+            document.getElementById("sifre").value = p.sifre;
+
+            const roller = p.roller || [];
+            document.getElementById("rol_olcum").checked = roller.includes("olcum");
+            
+            const onayCb = document.getElementById("rol_onay");
+            onayCb.checked = roller.includes("onay");
+            document.getElementById('varsayilan_kutu').style.display = onayCb.checked ? 'block' : 'none';
+            document.getElementById("varsayilan_onaylayici").checked = p.varsayilan_onaylayici;
+
+            const erisimler = p.erisimler || [];
+            document.querySelectorAll('.erisim').forEach(cb => {
+                cb.checked = erisimler.includes(cb.value);
+            });
+
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+
+        // --- FORMU SIFIRLAMA ---
+        function formSifirla() {
+            document.getElementById("personelForm").reset();
+            document.getElementById("duzenle_id").value = "";
+            document.getElementById("formBaslik").innerHTML = "➕ Yeni Personel Ekle";
+            document.getElementById("submitBtn").innerHTML = "💾 Personeli Sisteme Kaydet";
+            document.getElementById("submitBtn").style.background = "var(--primary)";
+            document.getElementById('varsayilan_kutu').style.display = 'none';
+        }
+
+        // --- KAYDET / GÜNCELLE ---
+        document.getElementById("personelForm").onsubmit = async (e) => {
+            e.preventDefault();
+
+            const roller = [];
+            if(document.getElementById("rol_olcum").checked) roller.push("olcum");
+            if(document.getElementById("rol_onay").checked) roller.push("onay");
+
+            const erisimler = Array.from(document.querySelectorAll('.erisim:checked')).map(cb => cb.value);
+            const duzenle_id = document.getElementById("duzenle_id").value;
+
+            const payload = {
+                ad_soyad: document.getElementById("ad_soyad").value,
+                kullanici_adi: document.getElementById("kullanici_adi").value,
+                sifre: document.getElementById("sifre").value,
+                roller: roller,
+                erisimler: erisimler,
+                varsayilan_onaylayici: document.getElementById("varsayilan_onaylayici").checked
+            };
+
+            const url = duzenle_id ? `/api/personeller/${duzenle_id}` : '/api/personeller';
+            const method = duzenle_id ? 'PUT' : 'POST';
+
+            try {
+                const res = await fetch(url, {
+                    method: method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                
+                if(res.ok) {
+                    showToast(duzenle_id ? "✅ Personel başarıyla güncellendi!" : "✅ Personel başarıyla eklendi!");
+                    formSifirla();
+                    personelleriGetir();
+                } else {
+                    const errorData = await res.json();
+                    showToast("❌ " + (errorData.error || "Kayıt sırasında hata oluştu!"), true);
+                }
+            } catch (err) { 
+                showToast("❌ Sunucuya bağlanılamadı!", true);
+                console.error(err); 
+            }
+        };
+
+        // --- SİLME ---
+        async function personelSil(id) {
+            if(!confirm("Bu personeli silmek istediğinize emin misiniz?")) return;
+            try {
+                const res = await fetch(`/api/personeller/${id}`, { method: 'DELETE' });
+                if(res.ok) {
+                    showToast("🗑️ Personel silindi!");
+                    personelleriGetir();
+                } else {
+                    showToast("❌ Silme işlemi başarısız!", true);
+                }
+            } catch(e) { 
+                showToast("❌ Sunucu hatası!", true);
+                console.error(e); 
+            }
+        }
+
+        window.onload = personelleriGetir;
+    </script>
+</body>
+</html>

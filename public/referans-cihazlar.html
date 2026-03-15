@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+
+    <meta charset="UTF-8"> <script>
+    // GÜVENLİK KONTROLÜ: Kullanıcı giriş yapmış mı?
+    const aktifKullanici = localStorage.getItem("labqms_user");
+    if (!aktifKullanici) {
+        // Eğer giriş yapmamışsa, anında login sayfasına şutla!
+        window.location.href = "login.html";
+    }
+    </script>
+
+    
+    <title>Sistem Ayarları</title>
+    <title>Referans Cihaz Yönetimi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #1E40AF; --border: #e2e8f0; --bg: #f8fafc; --accent: #4338ca; --success: #10B981; --warning: #f59e0b; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); padding: 20px; color: #334155; }
+        .card { background: #fff; padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        
+        /* Accordion */
+        .accordion { background: #fff; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .accordion-header { background: #fff; padding: 15px 25px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid transparent; }
+        .accordion-header.active { border-bottom-color: var(--border); background: #f1f5f9; }
+        .accordion-content { padding: 25px; display: none; }
+
+        #toast { visibility: hidden; min-width: 250px; background-color: var(--success); color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 3000; right: 30px; top: 30px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        #toast.show { visibility: visible; }
+        #toast.error { background-color: #ef4444; }
+
+        .btn { padding: 10px 15px; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; transition: 0.2s; }
+        .btn-primary { background: var(--primary); color: white; width: 100%; }
+        .btn-kal { background: var(--success); color: white; font-size: 0.75rem; margin-right: 5px; }
+        .btn-ara { background: var(--warning); color: white; font-size: 0.75rem; }
+        .btn-sm { padding: 4px 8px; font-size: 0.7rem; background: #f1f5f9; border: 1px solid var(--border); color: var(--primary); }
+        .btn:disabled { background: #94a3b8; cursor: not-allowed; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        label { display: block; font-size: 0.8rem; font-weight: 600; color: #64748b; margin-bottom: 5px; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; font-family: inherit; font-size: 0.9rem; }
+        
+        /* Arama Çubuğu */
+        .search-container { margin-bottom: 20px; }
+        .search-input { width: 100%; padding: 12px 15px; border: 2px solid var(--border); border-radius: 10px; font-size: 0.95rem; outline: none; transition: 0.3s; box-sizing: border-box; }
+        .search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(30, 64, 175, 0.1); }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: #f8fafc; text-align: left; padding: 12px; border-bottom: 2px solid var(--border); color: #64748b; font-size: 0.85rem; }
+        td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+        
+        .history-row { background: #f8fafc; display: none; }
+        .history-container { padding: 15px; border: 1px dashed #cbd5e1; border-radius: 8px; margin: 10px; background: white; overflow-x: auto; }
+        
+        .action-panel { display: none; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); background: #fff; border-left: 6px solid var(--primary); animation: slideDown 0.3s; }
+        .status-badge { padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div id="toast">✅ İşlem Başarılı!</div>
+
+    <div class="accordion">
+        <div class="accordion-header" onclick="toggleAccordion()">
+            <h3 style="margin:0; color:var(--primary);">🛠️ Yeni Referans Cihaz Tanımla / Düzenleme</h3>
+            <span id="accIcon">▼</span>
+        </div>
+        <div class="accordion-content" id="accContent">
+        <form id="refForm" onsubmit="kaydetReferans(event)">
+            <input type="hidden" id="ref_duzenle_id" value="">
+            <div class="form-grid">
+                <div><label>Kategori</label><select id="kategoriSelect" required><option value="">Yükleniyor...</option></select></div>
+                <div><label>Cihaz Adı</label><input type="text" id="cihaz_adi" required></div>
+                <div><label>Marka</label><input type="text" id="marka"></div>
+                <div><label>Model</label><input type="text" id="model"></div>
+                <div><label>Seri No</label><input type="text" id="seri_no" required></div>
+                <div><label>Envanter No</label><input type="text" id="envanter_no"></div>
+            </div>
+            <div class="form-grid">
+                <div><label>Ölçüm Aralığı</label><input type="text" id="olcme_araligi"></div>
+                <div style="grid-column: span 2;"><label>Kalibrasyon Kriteri</label><textarea id="kal_kriteri" rows="2"></textarea></div>
+                <div style="grid-column: span 2;"><label>Ara Kontrol Kriteri</label><textarea id="ara_kriteri" rows="2"></textarea></div>
+            </div>
+            <button type="submit" id="refBtn" class="btn btn-primary">🚀 Cihazı Envantere Kaydet</button>
+        </form>
+        </div>
+    </div>
+
+    <div id="panelKal" class="action-panel" style="border-color: var(--success);">
+        <h3 style="color:var(--success); margin-top:0;">📜 Kalibrasyon Veri Girişi</h3>
+        <p id="kalBaslik" style="font-weight:700;"></p>
+        <form onsubmit="kaydetDinamik(event, 'KAL')">
+            <input type="hidden" id="kal_ref_id">
+            <input type="hidden" id="kal_record_id">
+            <div class="form-grid">
+                <div><label>Kalibrasyon No</label><input type="text" id="kal_sertifika" required></div>
+                <div><label>İzlenebilirlik</label><input type="text" id="izlenebilirlik"></div>
+                <div><label>Kalibrasyon Tarihi</label><input type="date" id="kal_tarihi" required></div>
+                <div><label>Gelecek Kal. Tarihi</label><input type="date" id="kal_sonraki" required></div>
+            </div>
+            <button type="submit" id="kalSubmitBtn" class="btn btn-kal" style="width:100%; font-size:1rem;">💾 Kalibrasyon Verisini Kaydet</button>
+        </form>
+    </div>
+
+    <div id="panelAra" class="action-panel" style="border-color: var(--warning);">
+        <h3 style="color:var(--warning); margin-top:0;">🔍 Ara Kontrol Veri Girişi</h3>
+        <p id="araBaslik" style="font-weight:700;"></p>
+        <form onsubmit="kaydetDinamik(event, 'ARA')">
+            <input type="hidden" id="ara_ref_id">
+            <input type="hidden" id="ara_record_id">
+            <div class="form-grid">
+                <div><label>Ara Kontrol No</label><input type="text" id="ara_no" required></div>
+                <div><label>Kontrol Tarihi</label><input type="date" id="ara_tarihi" required></div>
+                <div><label>Gelecek Kontrol Tarihi</label><input type="date" id="ara_sonraki" required></div>
+            </div>
+            <button type="submit" id="araSubmitBtn" class="btn" style="width:100%; font-size:1rem; background:var(--warning); color:white;">💾 Ara Kontrol Verisini Kaydet</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0; color: var(--primary);">📚 Referans Listesi</h2>
+        
+        <div class="search-container">
+            <input type="text" id="cihazAra" class="search-input" placeholder="Cihaz adı, seri no veya envanter no ile ara..." onkeyup="tabloFiltrele()">
+        </div>
+
+        <table id="refTablo">
+            <thead>
+                <tr>
+                    <th>Kategori</th>
+                    <th>Cihaz Bilgisi</th>
+                    <th>Seri No</th>
+                    <th>Envanter No</th>
+                    <th>Ölçüm Aralığı</th>
+                    <th>İşlemler</th>
+                </tr>
+            </thead>
+            <tbody id="refListe"></tbody>
+        </table>
+    </div>
+
+    <script>
+        async function sayfaYukle() {
+            kategoriYukle();
+            referansYukle();
+        }
+
+        async function kategoriYukle() {
+            const res = await fetch('/api/kategoriler');
+            const data = await res.json();
+            const sel = document.getElementById("kategoriSelect");
+            sel.innerHTML = '<option value="">Seçin...</option>' + 
+                data.map(k => `<option value="${k.id}">${k.kategori_adi}</option>`).join('');
+        }
+
+        async function referansYukle() {
+            const res = await fetch('/api/referans-cihazlar');
+            const data = await res.json();
+            const tbody = document.getElementById("refListe");
+            tbody.innerHTML = data.map(r => `
+                <tr onclick="tarihceGoster(${r.id})" style="cursor:pointer;">
+                    <td><span class="status-badge" style="background:#e0e7ff; color:#4338ca;">${r.kategori_adi || 'Genel'}</span></td>
+                    <td><b>${r.cihaz_adi}</b><br><small style="color:#64748b">${r.marka || ''} ${r.model || ''}</small></td>
+                    <td>${r.seri_no}</td>
+                    <td>${r.envanter_no || '-'}</td>
+                    <td>${r.olcme_araligi || '-'}</td>
+                    <td>
+                        <button class="btn btn-kal" onclick="event.stopPropagation(); panelAc('KAL', ${r.id}, '${r.cihaz_adi}')">Kalibrasyon</button>
+                        <button class="btn btn-ara" onclick="event.stopPropagation(); panelAc('ARA', ${r.id}, '${r.cihaz_adi}')">Ara Kontrol</button>
+                        <button class="btn btn-sm" onclick="event.stopPropagation(); cihazDuzenle(${JSON.stringify(r).replace(/"/g, '&quot;')})" style="background:#e0e7ff;color:#4338ca;border:none;margin-left:3px;">✏️</button>
+                        <button class="btn btn-sm" onclick="event.stopPropagation(); cihazSil(${r.id})" style="background:#fee2e2;color:#dc2626;border:none;margin-left:3px;">🗑️</button>
+                    </td>
+                </tr>
+                <tr id="tarihce-${r.id}" class="history-row">
+                    <td colspan="6"><div class="history-container" id="details-${r.id}">Yükleniyor...</div></td>
+                </tr>
+            `).join('');
+        }
+
+        function tabloFiltrele() {
+            const input = document.getElementById("cihazAra");
+            const filter = input.value.toUpperCase();
+            const table = document.getElementById("refTablo");
+            const tr = table.getElementsByTagName("tr");
+
+            for (let i = 1; i < tr.length; i++) {
+                if (tr[i].classList.contains('history-row')) continue;
+                let text = tr[i].innerText.toUpperCase();
+                tr[i].style.display = text.indexOf(filter) > -1 ? "" : "none";
+                const nextRow = tr[i+1];
+                if(nextRow && nextRow.classList.contains('history-row')) nextRow.style.display = "none";
+            }
+        }
+
+        function panelAc(tip, id, ad) {
+            document.getElementById("panelKal").style.display = "none";
+            document.getElementById("panelAra").style.display = "none";
+            
+            if(tip === 'KAL') {
+                document.getElementById("panelKal").style.display = "block";
+                document.getElementById("kal_ref_id").value = id;
+                document.getElementById("kal_record_id").value = "";
+                document.getElementById("kalBaslik").innerText = ad;
+            } else {
+                document.getElementById("panelAra").style.display = "block";
+                document.getElementById("ara_ref_id").value = id;
+                document.getElementById("ara_record_id").value = "";
+                document.getElementById("araBaslik").innerText = ad;
+            }
+            window.scrollTo({top: 0, behavior: 'smooth'});
+        }
+
+        async function tarihceGoster(id) {
+            const row = document.getElementById(`tarihce-${id}`);
+            const detailDiv = document.getElementById(`details-${id}`);
+            if(row.style.display === "table-row") { row.style.display = "none"; return; }
+            row.style.display = "table-row";
+            
+            try {
+                const res = await fetch(`/api/referans-tarihce/${id}`);
+                const data = await res.json();
+                
+                if (data.length > 0) {
+                    detailDiv.innerHTML = `
+                        <table style="border:1px solid #e2e8f0; background:white; width:100%;">
+                            <tr style="font-size:0.75rem; background:#f8fafc; color:#64748b;">
+                                <th>İşlem Tipi</th>
+                                <th>Kalibrasyon No</th>
+                                <th>İzlenebilirlik</th>
+                                <th>Kalibrasyon Tarihi</th>
+                                <th>Gelecek Tarih</th>
+                                <th style="text-align:center;">İşlem</th>
+                            </tr>
+                            ${data.map(d => `
+                                <tr>
+                                    <td><span class="status-badge" style="background:${d.islem_tipi === 'KALİBRASYON' ? '#dcfce7' : '#fef3c7'}">${d.islem_tipi}</span></td>
+                                    <td><b>${d.sertifika_no}</b></td>
+                                    <td><small>${d.izlenebilirlik || '-'}</small></td>
+                                    <td>${new Date(d.kal_tarihi).toLocaleDateString('tr-TR')}</td>
+                                    <td>${new Date(d.sonraki_kal_tarihi).toLocaleDateString('tr-TR')}</td>
+                                    <td style="text-align:center;">
+                                        <button class="btn btn-sm" onclick="duzenleHazirla(${JSON.stringify(d).replace(/"/g, '&quot;')})">✏️ Düzenle</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </table>`;
+                } else {
+                    detailDiv.innerHTML = "Geçmiş kaydı bulunamadı.";
+                }
+            } catch(e) { detailDiv.innerHTML = "<span style='color:red'>Veri çekilemedi.</span>"; }
+        }
+
+        function duzenleHazirla(item) {
+            panelAc(item.islem_tipi === 'KALİBRASYON' ? 'KAL' : 'ARA', item.referans_id, 'Kaydı Düzenle');
+            
+            if(item.islem_tipi === 'KALİBRASYON') {
+                document.getElementById("kal_record_id").value = item.id;
+                document.getElementById("kal_sertifika").value = item.sertifika_no;
+                document.getElementById("izlenebilirlik").value = item.izlenebilirlik;
+                document.getElementById("kal_tarihi").value = item.kal_tarihi.split('T')[0];
+                document.getElementById("kal_sonraki").value = item.sonraki_kal_tarihi.split('T')[0];
+            } else {
+                document.getElementById("ara_record_id").value = item.id;
+                document.getElementById("ara_no").value = item.sertifika_no;
+                document.getElementById("ara_tarihi").value = item.kal_tarihi.split('T')[0];
+                document.getElementById("ara_sonraki").value = item.sonraki_kal_tarihi.split('T')[0];
+            }
+        }
+
+        async function kaydetReferans(e) {
+            e.preventDefault();
+            const btn = document.getElementById("refBtn");
+            const duzenleId = document.getElementById("ref_duzenle_id").value;
+            btn.disabled = true;
+            const payload = {
+                kategori_id: document.getElementById("kategoriSelect").value,
+                cihaz_adi: document.getElementById("cihaz_adi").value,
+                marka: document.getElementById("marka").value,
+                model: document.getElementById("model").value,
+                seri_no: document.getElementById("seri_no").value,
+                envanter_no: document.getElementById("envanter_no").value,
+                olcme_araligi: document.getElementById("olcme_araligi").value,
+                kalibrasyon_kriteri: document.getElementById("kal_kriteri").value,
+                ara_kontrol_kriteri: document.getElementById("ara_kriteri").value
+            };
+            const url = duzenleId ? `/api/referans-cihazlar/${duzenleId}` : '/api/referans-cihazlar';
+            const method = duzenleId ? 'PUT' : 'POST';
+            const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+            if (res.ok) {
+                bildirimGoster(duzenleId ? "✅ Cihaz güncellendi!" : "✅ Cihaz envantere kaydedildi!");
+                document.getElementById("refForm").reset();
+                document.getElementById("ref_duzenle_id").value = "";
+                document.getElementById("refBtn").textContent = "🚀 Cihazı Envantere Kaydet";
+                referansYukle();
+            }
+            btn.disabled = false;
+        }
+
+        async function kaydetDinamik(e, tip) {
+            e.preventDefault();
+            const btn = tip === 'KAL' ? document.getElementById("kalSubmitBtn") : document.getElementById("araSubmitBtn");
+            const recordId = tip === 'KAL' ? document.getElementById("kal_record_id").value : document.getElementById("ara_record_id").value;
+            
+            btn.disabled = true;
+            const payload = {
+                id: recordId || null,
+                referans_id: tip === 'KAL' ? document.getElementById("kal_ref_id").value : document.getElementById("ara_ref_id").value,
+                islem_tipi: tip === 'KAL' ? 'KALİBRASYON' : 'ARA_KONTROL',
+                sertifika_no: tip === 'KAL' ? document.getElementById("kal_sertifika").value : document.getElementById("ara_no").value,
+                izlenebilirlik: tip === 'KAL' ? document.getElementById("izlenebilirlik").value : '',
+                kal_tarihi: tip === 'KAL' ? document.getElementById("kal_tarihi").value : document.getElementById("ara_tarihi").value,
+                sonraki_kal_tarihi: tip === 'KAL' ? document.getElementById("kal_sonraki").value : document.getElementById("ara_sonraki").value
+            };
+
+            const url = recordId ? '/api/referans-takip-guncelle' : '/api/referans-takip';
+            const res = await fetch(url, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+
+            if(res.ok) {
+                bildirimGoster("✅ Kayıt başarıyla kaydedildi!");
+                document.getElementById("panelKal").style.display = "none";
+                document.getElementById("panelAra").style.display = "none";
+                referansYukle();
+            }
+            btn.disabled = false;
+        }
+
+        function toggleAccordion() {
+            const content = document.getElementById("accContent");
+            const header = document.querySelector(".accordion-header");
+            const icon = document.getElementById("accIcon");
+            if (content.style.display === "block") {
+                content.style.display = "none"; header.classList.remove("active"); icon.innerText = "▼";
+            } else {
+                content.style.display = "block"; header.classList.add("active"); icon.innerText = "▲";
+            }
+        }
+
+        function bildirimGoster(msg, isError = false) {
+            const t = document.getElementById("toast");
+            t.textContent = msg || "✅ İşlem başarıyla kaydedildi!";
+            t.className = isError ? "show error" : "show";
+            setTimeout(() => { t.className = t.className.replace("show","").replace("error","").trim(); }, 3000);
+        }
+
+        function cihazDuzenle(r) {
+            document.getElementById("ref_duzenle_id").value = r.id;
+            document.getElementById("kategoriSelect").value = r.kategori_id || "";
+            document.getElementById("cihaz_adi").value = r.cihaz_adi || "";
+            document.getElementById("marka").value = r.marka || "";
+            document.getElementById("model").value = r.model || "";
+            document.getElementById("seri_no").value = r.seri_no || "";
+            document.getElementById("envanter_no").value = r.envanter_no || "";
+            document.getElementById("olcme_araligi").value = r.olcme_araligi || "";
+            document.getElementById("kal_kriteri").value = r.kalibrasyon_kriteri || "";
+            document.getElementById("ara_kriteri").value = r.ara_kontrol_kriteri || "";
+            document.getElementById("refBtn").textContent = "💾 Cihazı Güncelle";
+            // Accordion'u aç
+            const content = document.getElementById("accContent");
+            const header = document.querySelector(".accordion-header");
+            content.style.display = "block"; header.classList.add("active");
+            document.getElementById("accIcon").innerText = "▲";
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function cihazSil(id) {
+            if (!confirm("Bu cihazı silmek istediğinize emin misiniz?")) return;
+            const res = await fetch(`/api/referans-cihazlar/${id}`, { method: 'DELETE' });
+            if (res.ok) { bildirimGoster("🗑️ Cihaz silindi!"); referansYukle(); }
+            else bildirimGoster("❌ Silme başarısız!", true);
+        }
+
+        window.onload = sayfaYukle;
+    </script>
+</body>
+</html>

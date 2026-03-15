@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary:#1E40AF; --border:#e2e8f0; --bg:#f8fafc; --success:#10B981; --warning:#f59e0b; --danger:#ef4444; --text:#334155; }
+        * { box-sizing:border-box; }
+        body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); margin:0; padding:20px; }
+
+        /* KPI KARTLARI */
+        .kpi-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:20px; }
+        .kpi { background:#fff; border-radius:12px; border:1px solid var(--border); padding:18px 20px; box-shadow:0 2px 6px rgba(0,0,0,0.04); border-left:4px solid; }
+        .kpi-val { font-size:2rem; font-weight:800; line-height:1; margin-bottom:4px; }
+        .kpi-lbl { font-size:0.78rem; font-weight:600; color:#64748b; }
+
+        /* ANA GRID */
+        .main-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+        .full { grid-column:1/-1; }
+
+        /* KART */
+        .card { background:#fff; border-radius:12px; border:1px solid var(--border); box-shadow:0 2px 6px rgba(0,0,0,0.04); overflow:hidden; }
+        .card-head { padding:14px 20px; border-bottom:1px solid var(--border); background:#f8fafc; display:flex; align-items:center; justify-content:space-between; }
+        .card-title { font-weight:700; color:var(--primary); font-size:0.92rem; }
+        .card-body { padding:16px 20px; }
+
+        /* AKTİVİTE */
+        .act-item { display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px dashed var(--border); font-size:0.85rem; }
+        .act-item:last-child { border-bottom:none; }
+        .act-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+        .act-time { color:#94a3b8; font-size:0.75rem; margin-left:auto; white-space:nowrap; }
+
+        /* YAKLAŞAN */
+        .yakl-item { display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px dashed var(--border); font-size:0.83rem; }
+        .yakl-item:last-child { border-bottom:none; }
+        .gun-badge { padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700; white-space:nowrap; }
+        .gun-red { background:#fee2e2; color:#dc2626; }
+        .gun-orange { background:#fff7ed; color:#c2410c; }
+        .gun-yellow { background:#fef9c3; color:#854d0e; }
+        .gun-green { background:#dcfce7; color:#166534; }
+
+        /* HIZLI İŞLEM */
+        .quick-btn { display:block; padding:11px 14px; background:#fff; margin-bottom:8px; border-radius:8px; text-decoration:none; color:var(--primary); font-weight:600; font-size:0.85rem; border:1px solid #bfdbfe; transition:0.15s; }
+        .quick-btn:hover { background:#eff6ff; border-color:var(--primary); }
+        .quick-btn:last-child { margin-bottom:0; }
+
+        /* TAKVİM */
+        .cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+        .cal-nav { background:none; border:1px solid var(--border); border-radius:6px; padding:4px 10px; cursor:pointer; font-size:0.85rem; color:var(--text); }
+        .cal-nav:hover { background:#f1f5f9; }
+        .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+        .cal-day-name { text-align:center; font-size:0.7rem; font-weight:700; color:#94a3b8; padding:4px; }
+        .cal-day { text-align:center; padding:5px 2px; border-radius:6px; font-size:0.78rem; cursor:pointer; min-height:32px; position:relative; transition:0.15s; }
+        .cal-day:hover { background:#eff6ff; }
+        .cal-day.other-month { color:#cbd5e1; }
+        .cal-day.today { background:var(--primary); color:#fff; font-weight:700; }
+        .cal-day.has-event::after { content:''; position:absolute; bottom:3px; left:50%; transform:translateX(-50%); width:4px; height:4px; border-radius:50%; background:#f59e0b; }
+        .cal-day.today.has-event::after { background:#fff; }
+
+        /* ETKİNLİK LİSTESİ */
+        .event-item { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; margin-bottom:6px; border-left:3px solid; font-size:0.83rem; background:#f8fafc; }
+        .event-item:last-child { margin-bottom:0; }
+        .event-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+        .event-del { background:none; border:none; cursor:pointer; color:#94a3b8; font-size:0.8rem; margin-left:auto; padding:2px 5px; border-radius:4px; }
+        .event-del:hover { background:#fee2e2; color:#dc2626; }
+
+        /* TAKVİM MODAL */
+        #calModal { display:none; position:fixed; z-index:2000; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; }
+        #calModal.open { display:flex; }
+        .cal-modal-box { background:#fff; border-radius:14px; width:90%; max-width:440px; padding:26px; position:relative; }
+        .cal-modal-close { position:absolute; right:16px; top:16px; background:none; border:none; font-size:18px; cursor:pointer; color:#64748b; }
+        .form-row { margin-bottom:14px; }
+        .form-row label { display:block; font-size:0.78rem; font-weight:700; color:#64748b; margin-bottom:5px; }
+        .form-row input, .form-row select, .form-row textarea { width:100%; padding:9px 12px; border:1px solid var(--border); border-radius:8px; outline:none; font-family:inherit; font-size:0.88rem; }
+        .form-row input:focus, .form-row select:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(30,64,175,0.1); }
+        .renk-row { display:flex; gap:8px; flex-wrap:wrap; }
+        .renk-btn { width:28px; height:28px; border-radius:50%; border:3px solid transparent; cursor:pointer; transition:0.15s; }
+        .renk-btn.secili { border-color:#334155; transform:scale(1.15); }
+        .btn-kaydet { background:var(--primary); color:#fff; border:none; padding:11px 24px; border-radius:8px; font-weight:700; cursor:pointer; width:100%; font-size:0.92rem; }
+
+        /* BİLDİRİM BANNER */
+        .bildirim-banner { background:#fef9c3; border:1px solid #fbbf24; border-radius:10px; padding:12px 16px; margin-bottom:16px; display:flex; align-items:flex-start; gap:10px; }
+        .bildirim-banner.kritik { background:#fee2e2; border-color:#f87171; }
+        .bildirim-item { font-size:0.83rem; color:#334155; padding:3px 0; border-bottom:1px dashed rgba(0,0,0,0.08); }
+        .bildirim-item:last-child { border-bottom:none; }
+
+        #toast { visibility:hidden; min-width:240px; background:#10B981; color:#fff; text-align:center; border-radius:8px; padding:14px; position:fixed; z-index:9999; right:24px; top:24px; font-weight:600; box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+        #toast.show { visibility:visible; }
+        #toast.error { background:#ef4444; }
+    </style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- TAKVİM MODAL -->
+<div id="calModal">
+    <div class="cal-modal-box">
+        <button class="cal-modal-close" onclick="modalKapat()">✕</button>
+        <h3 style="margin:0 0 18px; color:var(--primary);" id="modalBaslik">📅 Yeni Etkinlik</h3>
+        <input type="hidden" id="ev_id">
+        <div class="form-row">
+            <label>Başlık *</label>
+            <input type="text" id="ev_baslik" placeholder="Etkinlik başlığı...">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="form-row">
+                <label>Başlangıç *</label>
+                <input type="date" id="ev_baslangic">
+            </div>
+            <div class="form-row">
+                <label>Bitiş</label>
+                <input type="date" id="ev_bitis">
+            </div>
+        </div>
+        <div class="form-row">
+            <label>Atanan Personel</label>
+            <select id="ev_atanan">
+                <option value="">-- Seçiniz --</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <label>Tür</label>
+            <select id="ev_tip">
+                <option value="genel">📌 Genel</option>
+                <option value="kalibrasyon">🔬 Kalibrasyon</option>
+                <option value="toplanti">🤝 Toplantı</option>
+                <option value="bakim">🔧 Bakım</option>
+                <option value="egitim">📚 Eğitim</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <label>Açıklama</label>
+            <textarea id="ev_aciklama" rows="2" style="resize:vertical;"></textarea>
+        </div>
+        <div class="form-row">
+            <label>Renk</label>
+            <div class="renk-row" id="renkRow"></div>
+        </div>
+        <button class="btn-kaydet" onclick="etkinlikKaydet()">💾 Kaydet</button>
+    </div>
+</div>
+
+<!-- BİLDİRİM BANNER -->
+<div id="bildirimBanner" style="display:none;"></div>
+
+<!-- KPI -->
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <h2 style="margin:0;color:var(--primary);">📊 Dashboard</h2>
+    <span id="hosgeldin" style="font-size:0.85rem;color:#64748b;font-weight:600;"></span>
+</div>
+
+<div class="kpi-grid">
+    <div class="kpi" style="border-color:#3b82f6;">
+        <div class="kpi-val" style="color:#1E40AF;" id="k1">—</div>
+        <div class="kpi-lbl">📥 Kabul Edildi</div>
+    </div>
+    <div class="kpi" style="border-color:#f59e0b;">
+        <div class="kpi-val" style="color:#d97706;" id="k2">—</div>
+        <div class="kpi-lbl">⚙️ Kalibrasyonda</div>
+    </div>
+    <div class="kpi" style="border-color:#8b5cf6;">
+        <div class="kpi-val" style="color:#7c3aed;" id="k3">—</div>
+        <div class="kpi-lbl">🏅 Onay Bekleyen</div>
+    </div>
+    <div class="kpi" style="border-color:#10B981;">
+        <div class="kpi-val" style="color:#059669;" id="k4">—</div>
+        <div class="kpi-lbl">✅ Tamamlanan (Bu Yıl)</div>
+    </div>
+    <div class="kpi" style="border-color:#64748b;">
+        <div class="kpi-val" style="color:#475569;" id="k5">—</div>
+        <div class="kpi-lbl">🏢 Toplam Müşteri</div>
+    </div>
+</div>
+
+<!-- ORTA BÖLÜM -->
+<div class="main-grid">
+
+    <!-- YAKLAŞAN AKTİVİTELER -->
+    <div class="card">
+        <div class="card-head">
+            <div class="card-title">⚠️ Yaklaşan Aktiviteler (30 Gün)</div>
+        </div>
+        <div class="card-body" id="yaklasanListesi">
+            <div style="color:#94a3b8;font-size:0.85rem;text-align:center;padding:10px;">Yükleniyor...</div>
+        </div>
+    </div>
+
+    <!-- HIZLI İŞLEMLER + SON İŞ EMİRLERİ -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="card">
+            <div class="card-head"><div class="card-title">💡 Hızlı İşlemler</div></div>
+            <div class="card-body">
+                <a href="kabul.html" target="ekran" class="quick-btn" onclick="parent.aktifYap && parent.document.querySelector('[href=\'kabul.html\']') && parent.aktifYap(parent.document.querySelector('[href=\'kabul.html\']'))">📥 Yeni Kabul Fişi Aç</a>
+                <a href="teklif.html" target="ekran" class="quick-btn">📄 Yeni Teklif Hazırla</a>
+                <a href="musteriler.html" target="ekran" class="quick-btn">🏢 Yeni Müşteri Ekle</a>
+                <a href="operasyon.html" target="ekran" class="quick-btn">🔄 Operasyon Merkezi</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-head"><div class="card-title">🔔 Son İş Emirleri</div></div>
+            <div class="card-body" id="sonIsEmirleri">
+                <div style="color:#94a3b8;font-size:0.85rem;">Yükleniyor...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TAKVİM -->
+<div class="card full">
+    <div class="card-head">
+        <div class="card-title">📅 İş Takvimi</div>
+        <button onclick="modalAc()" style="background:var(--primary);color:#fff;border:none;padding:7px 16px;border-radius:7px;cursor:pointer;font-weight:600;font-size:0.82rem;">+ Etkinlik Ekle</button>
+    </div>
+    <div class="card-body">
+        <div style="display:grid;grid-template-columns:300px 1fr;gap:20px;">
+            <!-- Takvim -->
+            <div>
+                <div class="cal-header">
+                    <button class="cal-nav" onclick="ayDegistir(-1)">‹</button>
+                    <strong id="calBaslik" style="font-size:0.9rem;color:var(--primary);"></strong>
+                    <button class="cal-nav" onclick="ayDegistir(1)">›</button>
+                </div>
+                <div class="cal-grid" id="calGrid">
+                    <div class="cal-day-name">Pzt</div>
+                    <div class="cal-day-name">Sal</div>
+                    <div class="cal-day-name">Çar</div>
+                    <div class="cal-day-name">Per</div>
+                    <div class="cal-day-name">Cum</div>
+                    <div class="cal-day-name">Cmt</div>
+                    <div class="cal-day-name">Paz</div>
+                </div>
+            </div>
+            <!-- Etkinlikler -->
+            <div>
+                <div style="font-weight:700;color:var(--primary);margin-bottom:12px;font-size:0.88rem;" id="seciliGunBaslik">Bu Ayki Etkinlikler</div>
+                <div id="etkinlikListesi" style="max-height:280px;overflow-y:auto;">
+                    <div style="color:#94a3b8;font-size:0.85rem;">Yükleniyor...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const RENKLER = ['#1E40AF','#059669','#d97706','#dc2626','#7c3aed','#0891b2','#be185d','#475569'];
+    const TIP_ICON = { genel:'📌', kalibrasyon:'🔬', toplanti:'🤝', bakim:'🔧', egitim:'📚' };
+
+    let takvimYil = new Date().getFullYear();
+    let takvimAy = new Date().getMonth();
+    let tumEtkinlikler = [];
+    let personeller = [];
+    let seciliGun = null;
+    let seciliRenk = RENKLER[0];
+
+    function showToast(msg, err=false) {
+        const t=document.getElementById("toast"); t.textContent=msg;
+        t.className=err?"show error":"show"; setTimeout(()=>t.className="",3000);
+    }
+
+    // ── DASHBOARD VERİLERİ ──
+    async function dashboardYukle() {
+        try {
+            const res = await fetch('/api/dashboard');
+            const d = await res.json();
+            document.getElementById("k1").textContent = d.kabul_edildi;
+            document.getElementById("k2").textContent = d.kalibrasyonda;
+            document.getElementById("k3").textContent = d.onay_bekleyen;
+            document.getElementById("k4").textContent = d.bu_yil;
+            document.getElementById("k5").textContent = d.musteri_sayisi;
+            renderYaklasan(d.yaklasan_aktiviteler || []);
+            renderBildirimler(d.yaklasan_aktiviteler || [], d.yaklasan_etkinlikler || []);
+        } catch(e) { console.error(e); }
+    }
+
+    // ── BİLDİRİM BANNER ──
+    function renderBildirimler(aktiviteler, etkinlikler) {
+        const banner = document.getElementById("bildirimBanner");
+        const items = [];
+
+        // Referans cihaz: 30 gün veya geçmiş
+        aktiviteler.forEach(r => {
+            const gun = parseInt(r.kalan_gun);
+            const tip = r.islem_tipi === 'KALİBRASYON' ? '🔬 Kalibrasyon' : '🔍 Ara Kontrol';
+            const tarih = new Date(r.sonraki_kal_tarihi).toLocaleDateString('tr-TR');
+            if (gun < 0) {
+                items.push({ kritik: true, text: `${tip} VADESİ GEÇTİ! → ${r.cihaz_adi} (S/N: ${r.seri_no}) — ${tarih}` });
+            } else if (gun === 0) {
+                items.push({ kritik: true, text: `${tip} BUGÜN! → ${r.cihaz_adi} (S/N: ${r.seri_no})` });
+            } else if (gun <= 30) {
+                items.push({ kritik: gun <= 7, text: `${tip} yaklaşıyor → ${r.cihaz_adi} (S/N: ${r.seri_no}) — ${gun} gün kaldı (${tarih})` });
+            }
+        });
+
+        // Takvim: yarın başlayacak etkinlikler
+        etkinlikler.forEach(e => {
+            const atanan = e.atanan_adi ? ` — Atanan: ${e.atanan_adi}` : '';
+            items.push({ kritik: false, text: `📅 Yarın başlıyor: "${e.baslik}"${atanan}` });
+        });
+
+        if (!items.length) { banner.style.display = 'none'; return; }
+
+        const kritikVar = items.some(i => i.kritik);
+        banner.className = kritikVar ? 'bildirim-banner kritik' : 'bildirim-banner';
+        banner.style.display = 'flex';
+        banner.innerHTML = `
+            <div style="font-size:1.3rem;flex-shrink:0;">${kritikVar ? '🚨' : '⚠️'}</div>
+            <div style="flex:1;">
+                <div style="font-weight:700;margin-bottom:6px;font-size:0.88rem;color:${kritikVar?'#dc2626':'#854d0e'};">
+                    ${kritikVar ? 'Kritik Bildirimler' : 'Yaklaşan Aktiviteler'} (${items.length})
+                </div>
+                ${items.map(i => `<div class="bildirim-item" style="${i.kritik?'font-weight:600;color:#dc2626;':''}">
+                    ${i.kritik ? '🔴' : '🟡'} ${i.text}
+                </div>`).join('')}
+            </div>
+            <button onclick="this.parentElement.style.display='none'" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1rem;flex-shrink:0;align-self:flex-start;">✕</button>`;
+    }
+
+    function renderYaklasan(liste) {
+        const el = document.getElementById("yaklasanListesi");
+        if (!liste.length) { el.innerHTML='<div style="color:#94a3b8;font-size:0.85rem;text-align:center;padding:10px;">Yaklaşan aktivite yok 🎉</div>'; return; }
+        el.innerHTML = liste.map(r => {
+            const gun = parseInt(r.kalan_gun);
+            const tarih = new Date(r.sonraki_kal_tarihi).toLocaleDateString('tr-TR');
+            let cls = gun < 0 ? 'gun-red' : gun <= 7 ? 'gun-red' : gun <= 15 ? 'gun-orange' : gun <= 30 ? 'gun-yellow' : 'gun-green';
+            const gunText = gun < 0 ? `${Math.abs(gun)} gün geçti!` : gun === 0 ? 'Bugün!' : `${gun} gün kaldı`;
+            const tip = r.islem_tipi === 'KALİBRASYON' ? '🔬' : '🔍';
+            return `<div class="yakl-item">
+                <span style="font-size:1.1rem;">${tip}</span>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;font-size:0.83rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.cihaz_adi}</div>
+                    <div style="color:#94a3b8;font-size:0.75rem;">S/N: ${r.seri_no} · ${tarih}</div>
+                </div>
+                <span class="gun-badge ${cls}">${gunText}</span>
+            </div>`;
+        }).join('');
+    }
+
+    // ── SON İŞ EMİRLERİ ──
+    async function sonIsEmirleriYukle() {
+        try {
+            const res = await fetch('/api/is-emirleri');
+            const data = await res.json();
+            const son5 = data.slice(0, 5);
+            const ASAMA_LABEL = { kabul_edildi:'Kabul', 'hazırlanıyor':'Hazırlanıyor', 'tamamlandı':'Tamamlandı', imzalandı:'İmzalandı', 'onaylandı':'Onaylandı', sertifika_gönderildi:'Gönderildi' };
+            const el = document.getElementById("sonIsEmirleri");
+            if (!son5.length) { el.innerHTML='<div style="color:#94a3b8;font-size:0.85rem;">Henüz iş emri yok.</div>'; return; }
+            el.innerHTML = son5.map(r => {
+                const asama = r.asama || 'kabul_edildi';
+                const renk = { kabul_edildi:'#64748b', 'hazırlanıyor':'#d97706', 'tamamlandı':'#1e40af', imzalandı:'#7c3aed', 'onaylandı':'#059669', sertifika_gönderildi:'#166534' }[asama] || '#64748b';
+                return `<div class="act-item">
+                    <div class="act-dot" style="background:${renk};"></div>
+                    <div><strong>${r.ie_no}</strong> · ${r.firma_adi}</div>
+                    <span style="background:#f1f5f9;color:${renk};padding:2px 7px;border-radius:8px;font-size:0.72rem;font-weight:700;margin-left:auto;">${ASAMA_LABEL[asama]||asama}</span>
+                </div>`;
+            }).join('');
+        } catch(e) {}
+    }
+
+    // ── TAKVİM ──
+    async function takvimiYukle() {
+        const res = await fetch('/api/takvim');
+        tumEtkinlikler = await res.json();
+        takvimiCiz();
+        renderEtkinlikler(null);
+    }
+
+    function takvimiCiz() {
+        const aylar = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+        document.getElementById("calBaslik").textContent = `${aylar[takvimAy]} ${takvimYil}`;
+
+        const ilkGun = new Date(takvimYil, takvimAy, 1);
+        const sonGun = new Date(takvimYil, takvimAy + 1, 0);
+        const ilkHafta = (ilkGun.getDay() + 6) % 7; // Pazartesi=0
+
+        const bugun = new Date();
+        const bugunStr = `${bugun.getFullYear()}-${String(bugun.getMonth()+1).padStart(2,'0')}-${String(bugun.getDate()).padStart(2,'0')}`;
+
+        // Etkinlikli günler
+        const etkinlikliGunler = new Set(tumEtkinlikler.map(e => e.baslangic?.substring(0,10)));
+
+        const grid = document.getElementById("calGrid");
+        // Sadece günleri temizle (başlık satırı koru)
+        while (grid.children.length > 7) grid.removeChild(grid.lastChild);
+
+        // Önceki ay boşlukları
+        const oncekiAySon = new Date(takvimYil, takvimAy, 0).getDate();
+        for (let i = ilkHafta - 1; i >= 0; i--) {
+            const d = document.createElement("div");
+            d.className = "cal-day other-month";
+            d.textContent = oncekiAySon - i;
+            grid.appendChild(d);
+        }
+
+        // Bu ay
+        for (let g = 1; g <= sonGun.getDate(); g++) {
+            const d = document.createElement("div");
+            d.className = "cal-day";
+            d.textContent = g;
+            const gunStr = `${takvimYil}-${String(takvimAy+1).padStart(2,'0')}-${String(g).padStart(2,'0')}`;
+            if (gunStr === bugunStr) d.classList.add("today");
+            if (etkinlikliGunler.has(gunStr)) d.classList.add("has-event");
+            d.onclick = () => gunTikla(gunStr, g);
+            grid.appendChild(d);
+        }
+
+        // Sonraki ay dolgu
+        const kalan = 42 - (ilkHafta + sonGun.getDate());
+        for (let i = 1; i <= kalan; i++) {
+            const d = document.createElement("div");
+            d.className = "cal-day other-month";
+            d.textContent = i;
+            grid.appendChild(d);
+        }
+    }
+
+    function gunTikla(gunStr, gun) {
+        seciliGun = gunStr;
+        const aylar = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+        document.getElementById("seciliGunBaslik").textContent = `${gun} ${aylar[takvimAy]} ${takvimYil} Etkinlikleri`;
+        renderEtkinlikler(gunStr);
+    }
+
+    function renderEtkinlikler(gunStr) {
+        const el = document.getElementById("etkinlikListesi");
+        let liste = gunStr
+            ? tumEtkinlikler.filter(e => e.baslangic?.substring(0,10) === gunStr)
+            : tumEtkinlikler.filter(e => e.baslangic?.startsWith(`${takvimYil}-${String(takvimAy+1).padStart(2,'0')}`));
+
+        if (!liste.length) { el.innerHTML='<div style="color:#94a3b8;font-size:0.85rem;">Bu tarihte etkinlik yok.</div>'; return; }
+
+        el.innerHTML = liste.map(e => {
+            const tarih = e.baslangic?.substring(0,10);
+            const bitis = e.bitis && e.bitis !== e.baslangic ? ` → ${e.bitis?.substring(0,10)}` : '';
+            return `<div class="event-item" style="border-color:${e.renk||'#1E40AF'};">
+                <div class="event-dot" style="background:${e.renk||'#1E40AF'};"></div>
+                <div style="flex:1;">
+                    <div style="font-weight:700;">${TIP_ICON[e.tip]||'📌'} ${e.baslik}</div>
+                    <div style="color:#64748b;font-size:0.75rem;">${tarih}${bitis}${e.atanan_adi?' · 👤 '+e.atanan_adi:''}</div>
+                    ${e.aciklama?`<div style="color:#94a3b8;font-size:0.73rem;margin-top:2px;">${e.aciklama}</div>`:''}
+                </div>
+                <button class="event-del" onclick="etkinlikSil(${e.id})">🗑️</button>
+            </div>`;
+        }).join('');
+    }
+
+    function ayDegistir(yon) {
+        takvimAy += yon;
+        if (takvimAy > 11) { takvimAy = 0; takvimYil++; }
+        if (takvimAy < 0) { takvimAy = 11; takvimYil--; }
+        seciliGun = null;
+        document.getElementById("seciliGunBaslik").textContent = "Bu Ayki Etkinlikler";
+        takvimiCiz();
+        renderEtkinlikler(null);
+    }
+
+    // ── MODAL ──
+    function modalAc(gunStr) {
+        document.getElementById("ev_id").value = "";
+        document.getElementById("ev_baslik").value = "";
+        document.getElementById("ev_baslangic").value = gunStr || seciliGun || new Date().toISOString().substring(0,10);
+        document.getElementById("ev_bitis").value = "";
+        document.getElementById("ev_atanan").value = "";
+        document.getElementById("ev_tip").value = "genel";
+        document.getElementById("ev_aciklama").value = "";
+        document.getElementById("modalBaslik").textContent = "📅 Yeni Etkinlik";
+        seciliRenk = RENKLER[0];
+        renklerRender();
+        document.getElementById("calModal").classList.add("open");
+    }
+
+    function modalKapat() { document.getElementById("calModal").classList.remove("open"); }
+
+    function renklerRender() {
+        document.getElementById("renkRow").innerHTML = RENKLER.map(r =>
+            `<div class="renk-btn ${r===seciliRenk?'secili':''}" style="background:${r};" onclick="seciliRenk='${r}';renklerRender();"></div>`
+        ).join('');
+    }
+
+    async function etkinlikKaydet() {
+        const baslik = document.getElementById("ev_baslik").value.trim();
+        const baslangic = document.getElementById("ev_baslangic").value;
+        if (!baslik || !baslangic) return showToast("❌ Başlık ve tarih zorunlu!", true);
+
+        const id = document.getElementById("ev_id").value;
+        const payload = {
+            baslik, baslangic,
+            bitis: document.getElementById("ev_bitis").value || baslangic,
+            atanan_id: document.getElementById("ev_atanan").value || null,
+            tip: document.getElementById("ev_tip").value,
+            aciklama: document.getElementById("ev_aciklama").value,
+            renk: seciliRenk
+        };
+
+        const url = id ? `/api/takvim/${id}` : '/api/takvim';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+        if (res.ok) {
+            showToast("✅ Etkinlik kaydedildi!");
+            modalKapat();
+            await takvimiYukle();
+        } else showToast("❌ Kayıt başarısız!", true);
+    }
+
+    async function etkinlikSil(id) {
+        if (!confirm("Bu etkinliği silmek istediğinize emin misiniz?")) return;
+        const res = await fetch(`/api/takvim/${id}`, { method:'DELETE' });
+        if (res.ok) { showToast("🗑️ Silindi!"); await takvimiYukle(); }
+        else showToast("❌ Silinemedi!", true);
+    }
+
+    // ── PERSONEL YÜKLEMESİ ──
+    async function personelYukle() {
+        try {
+            const res = await fetch('/api/personeller');
+            personeller = await res.json();
+            const sel = document.getElementById("ev_atanan");
+            sel.innerHTML = '<option value="">-- Seçiniz --</option>' +
+                personeller.map(p => `<option value="${p.id}">${p.ad_soyad}</option>`).join('');
+        } catch(e) {}
+    }
+
+    // ── HOŞGELDİN ──
+    function hosgeldinGoster() {
+        const kullanici = localStorage.getItem("labqms_user");
+        if (kullanici) {
+            const u = JSON.parse(kullanici);
+            document.getElementById("hosgeldin").textContent = `👋 Hoş geldin, ${u.ad_soyad}`;
+        }
+    }
+
+    async function init() {
+        hosgeldinGoster();
+        await personelYukle();
+        dashboardYukle();
+        sonIsEmirleriYukle();
+        takvimiYukle();
+        renklerRender();
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>

@@ -1,0 +1,1576 @@
+require('dotenv').config();
+const express = require('express');
+const nodemailer = require('nodemailer');
+const https = require('https');
+const aws4  = require('aws4');
+
+const R2_BUCKET   = process.env.R2_BUCKET_NAME || 'labqms-pdfs';
+const R2_ACCOUNT  = process.env.R2_ACCOUNT_ID  || '';
+const R2_HOST     = `${R2_ACCOUNT}.r2.cloudflarestorage.com`;
+
+function r2Request(method, key, body) {
+    return new Promise((resolve, reject) => {
+        const encodedKey = key.split('/').map(encodeURIComponent).join('/');
+        const opts = aws4.sign({
+            service:  's3',
+            region:   'auto',
+            method,
+            host:     R2_HOST,
+            path:     `/${R2_BUCKET}/${encodedKey}`,
+            headers:  body ? { 'Content-Type': 'application/pdf', 'Content-Length': body.length } : {},
+            body
+        }, {
+            accessKeyId:     process.env.R2_ACCESS_KEY_ID,
+            secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+        });
+
+        const req = https.request({
+            hostname: R2_HOST,
+            path:     `/${R2_BUCKET}/${encodedKey}`,
+            method,
+            headers:  opts.headers
+        }, res => {
+            const chunks = [];
+            res.on('data', c => chunks.push(c));
+            res.on('end', () => {
+                if(res.statusCode >= 300) {
+                    reject(new Error(`R2 HTTP ${res.statusCode}: ${Buffer.concat(chunks).toString()}`));
+                } else {
+                    resolve(Buffer.concat(chunks));
+                }
+            });
+        });
+        req.on('error', reject);
+        if(body) req.write(body);
+        req.end();
+    });
+}
+
+async function r2Yukle(key, buffer) {
+    await r2Request('PUT', key, buffer);
+    return key;
+}
+
+async function r2Indir(key) {
+    return await r2Request('GET', key, null);
+}
+const QRCode    = require('qrcode');
+const { PDFDocument } = require('pdf-lib');
+const { Pool } = require('pg');
+const path = require('path');
+const cors = require('cors');
+
+const app = express(); // İŞTE HATAYA SEBEP OLAN EKSİK SATIR BUYDU!
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json({ limit: "100mb" }));
+app.use(express.urlencoded({ extended: true, limit: "100mb" }));
+app.use(express.static(path.join(__dirname, 'public'))); 
+
+// Neon.tech PostgreSQL Bağlantısı
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+});
+
+// TEST YOLU
+app.get('/api/test', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT NOW()');
+        res.json({ success: true, message: "Bağlantı Başarılı!", time: result.rows[0].now });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- MÜŞTERİLER API ---
+
+// 1. LİSTELEME
+app.get('/api/musteriler', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM musteriler ORDER BY id DESC');
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. KAYDET VEYA GÜNCELLE
+app.post('/api/musteriler', async (req, res) => {
+    try {
+        const { id, firma_adi, sube_adi, yetkililer, telefonlar, sertifika_mailleri, fatura_mailleri, il, ilce, adres, vergi_dairesi, vergi_no } = req.body;
+        
+        if (id) {
+            // GÜNCELLEME
+            const query = `UPDATE musteriler SET firma_adi=$1, sube_adi=$2, yetkililer=$3, telefonlar=$4, sertifika_mailleri=$5, fatura_mailleri=$6, il=$7, ilce=$8, adres=$9, vergi_dairesi=$10, vergi_no=$11 WHERE id=$12 RETURNING *`;
+            const result = await pool.query(query, [firma_adi, sube_adi||null, JSON.stringify(yetkililer), JSON.stringify(telefonlar), JSON.stringify(sertifika_mailleri), JSON.stringify(fatura_mailleri), il, ilce, adres, vergi_dairesi, vergi_no, id]);
+            res.json(result.rows[0]);
+        } else {
+            // YENİ KAYIT
+            const query = `INSERT INTO musteriler (firma_adi, sube_adi, yetkililer, telefonlar, sertifika_mailleri, fatura_mailleri, il, ilce, adres, vergi_dairesi, vergi_no) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`;
+            const result = await pool.query(query, [firma_adi, sube_adi||null, JSON.stringify(yetkililer), JSON.stringify(telefonlar), JSON.stringify(sertifika_mailleri), JSON.stringify(fatura_mailleri), il, ilce, adres, vergi_dairesi, vergi_no]);
+            res.json(result.rows[0]);
+        }
+    } catch (err) {
+        console.error("Hata:", err.message);
+        res.status(500).json({ error: "Sunucu Hatası" });
+    }
+});
+
+
+// --- KATEGORİ YÖNETİMİ API ---
+
+// 1. Tüm Kategorileri Getir
+app.get('/api/kategoriler', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM kategoriler ORDER BY kategori_adi ASC');
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. Yeni Kategori Ekle
+app.post('/api/kategoriler', async (req, res) => {
+    try {
+        const { kategori_adi } = req.body;
+        const result = await pool.query(
+            'INSERT INTO kategoriler (kategori_adi) VALUES ($1) RETURNING *',
+            [kategori_adi]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        if (err.code === '23505') { // Benzersizlik hatası
+            return res.status(400).json({ error: "Bu kategori zaten mevcut." });
+        }
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3. Kategori Güncelle
+app.put('/api/kategoriler/:id', async (req, res) => {
+    try {
+        const { kategori_adi } = req.body;
+        const result = await pool.query('UPDATE kategoriler SET kategori_adi=$1 WHERE id=$2 RETURNING *', [kategori_adi, req.params.id]);
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 4. Kategori Sil
+app.delete('/api/kategoriler/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await pool.query('DELETE FROM kategoriler WHERE id = $1', [id]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/musteriler/:id', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM musteriler WHERE id=$1', [req.params.id]);
+        if(!result.rows.length) return res.status(404).json({ error: 'Bulunamadı' });
+        res.json(result.rows[0]);
+    } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/musteriler/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM musteriler WHERE id=$1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// CİHAZ KÜTÜPHANESİ API YOLLARI
+
+// 1. Listeleme (Kategorilerle Birlikte)
+app.get('/api/cihaz-kutuphanesi', async (req, res) => {
+    try {
+        const query = `
+            SELECT ck.*, k.kategori_adi 
+            FROM cihaz_kutuphanesi ck 
+            INNER JOIN kategoriler k ON ck.kategori_id = k.id 
+            ORDER BY ck.cihaz_adi ASC`;
+        const result = await pool.query(query);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. Kaydetme
+app.post('/api/cihaz-kutuphanesi', async (req, res) => {
+    try {
+        const { kategori_id, cihaz_adi, periyot, fiyat, para_birimi } = req.body;
+        const query = `
+            INSERT INTO cihaz_kutuphanesi (kategori_id, cihaz_adi, periyot, fiyat, para_birimi) 
+            VALUES ($1, $2, $3, $4, $5) RETURNING *`;
+        const result = await pool.query(query, [kategori_id, cihaz_adi, periyot, fiyat, para_birimi]);
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error("Kayıt Hatası:", err.message);
+        res.status(500).json({ error: "Veritabanı kayıt hatası." });
+    }
+});
+
+// 3. Cihaz Güncelle
+app.put('/api/cihaz-kutuphanesi/:id', async (req, res) => {
+    try {
+        const { kategori_id, cihaz_adi, periyot, fiyat, para_birimi } = req.body;
+        const result = await pool.query(
+            'UPDATE cihaz_kutuphanesi SET kategori_id=$1, cihaz_adi=$2, periyot=$3, fiyat=$4, para_birimi=$5 WHERE id=$6 RETURNING *',
+            [kategori_id, cihaz_adi, periyot, fiyat, para_birimi, req.params.id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 4. Cihaz Sil
+app.delete('/api/cihaz-kutuphanesi/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM cihaz_kutuphanesi WHERE id=$1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// TEKLİF HAZIRLAMA API'LERİ
+
+// 1. Teklif için müşteri ve cihaz bilgilerini getiren endpoint
+app.get('/api/teklif-on-veriler', async (req, res) => {
+    try {
+        const musteriler = await pool.query('SELECT id, firma_adi FROM musteriler ORDER BY firma_adi ASC');
+        const cihazlar = await pool.query(`
+            SELECT ck.id, ck.cihaz_adi, ck.fiyat, ck.para_birimi, k.kategori_adi 
+            FROM cihaz_kutuphanesi ck 
+            JOIN kategoriler k ON ck.kategori_id = k.id 
+            ORDER BY ck.cihaz_adi ASC`);
+        
+        res.json({
+            musteriler: musteriler.rows,
+            cihazlar: cihazlar.rows
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+// --- TEKLİFLER ---
+app.get('/api/teklifler', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT t.*, m.firma_adi, m.sube_adi
+            FROM teklifler t
+            LEFT JOIN musteriler m ON t.musteri_id = m.id
+            ORDER BY t.olusturulma_tarihi DESC`);
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/teklifler/:id', async (req, res) => {
+    try {
+        const { musteri_id, teklif_tarihi, gecerlilik_gun, teklif_notu, indirim_oran, ara_toplam, genel_toplam, para_birimi, kalemler, durum } = req.body;
+        const result = await pool.query(
+            `UPDATE teklifler SET musteri_id=$1, teklif_tarihi=$2, gecerlilik_gun=$3, teklif_notu=$4, indirim_oran=$5, ara_toplam=$6, genel_toplam=$7, para_birimi=$8, kalemler=$9, durum=$10 WHERE id=$11 RETURNING *`,
+            [musteri_id, teklif_tarihi, gecerlilik_gun, teklif_notu, indirim_oran, ara_toplam, genel_toplam, para_birimi, JSON.stringify(kalemler), durum||'Taslak', req.params.id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/teklifler/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM teklifler WHERE id=$1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/teklifler', async (req, res) => {
+    try {
+        const { musteri_id, teklif_tarihi, gecerlilik_gun, teklif_notu, indirim_oran, ara_toplam, genel_toplam, para_birimi, kalemler } = req.body;
+        // Teklif no oluştur: TKL-2026-001
+        const yil = new Date().getFullYear();
+        const sayac = await pool.query(`SELECT COUNT(*) FROM teklifler WHERE EXTRACT(YEAR FROM olusturulma_tarihi) = $1`, [yil]);
+        const no = String(parseInt(sayac.rows[0].count) + 1).padStart(3, '0');
+        const teklif_no = `TKL-${yil}-${no}`;
+
+        const result = await pool.query(
+            `INSERT INTO teklifler (musteri_id, teklif_no, teklif_tarihi, gecerlilik_gun, teklif_notu, indirim_oran, ara_toplam, genel_toplam, para_birimi, kalemler)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+            [musteri_id, teklif_no, teklif_tarihi, gecerlilik_gun, teklif_notu, indirim_oran, ara_toplam, genel_toplam, para_birimi, JSON.stringify(kalemler)]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Firmaya göre müşteri cihazlarını getir (teklif için)
+app.get('/api/musteri-cihazlari-firma/:musteri_id', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT mc.id, mc.cihaz_adi, mc.marka, mc.model, mc.seri_no, mc.envanter_no,
+                   ck.fiyat, ck.para_birimi
+            FROM musteri_cihazlari mc
+            LEFT JOIN cihaz_kutuphanesi ck ON LOWER(ck.cihaz_adi) = LOWER(mc.cihaz_adi)
+            WHERE mc.musteri_id = $1
+            ORDER BY mc.cihaz_adi ASC`,
+            [req.params.musteri_id]
+        );
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- TALİMATLAR (PROSEDÜR) API ---
+
+app.get('/api/talimatlar', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM talimatlar ORDER BY talimat_kodu ASC');
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/talimatlar', async (req, res) => {
+    try {
+        const { talimat_adi, talimat_kodu, olcme_araligi } = req.body;
+        const result = await pool.query(
+            'INSERT INTO talimatlar (talimat_adi, talimat_kodu, olcme_araligi) VALUES ($1, $2, $3) RETURNING *',
+            [talimat_adi, talimat_kodu, olcme_araligi]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/talimatlar/:id', async (req, res) => {
+    try {
+        const { talimat_adi, talimat_kodu, olcme_araligi } = req.body;
+        const result = await pool.query(
+            'UPDATE talimatlar SET talimat_adi=$1, talimat_kodu=$2, olcme_araligi=$3 WHERE id=$4 RETURNING *',
+            [talimat_adi, talimat_kodu, olcme_araligi, req.params.id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/talimatlar/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM talimatlar WHERE id=$1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- REFERANS CİHAZLAR API GRUBU ---
+
+// Tüm cihazları listele (Son işlem bilgisiyle beraber)
+app.get('/api/referans-cihazlar', async (req, res) => {
+    try {
+        const query = `
+            SELECT rc.*, k.kategori_adi, rt.sertifika_no, rt.sonraki_kal_tarihi
+            FROM referans_cihazlar rc
+            LEFT JOIN kategoriler k ON rc.kategori_id = k.id
+            LEFT JOIN (
+                SELECT DISTINCT ON (referans_id) * FROM referans_takip 
+                ORDER BY referans_id, kal_tarihi DESC
+            ) rt ON rc.id = rt.referans_id
+            ORDER BY rc.id DESC`;
+        const result = await pool.query(query);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Yeni Referans Cihaz Kaydet (Sabit Veriler)
+app.post('/api/referans-cihazlar', async (req, res) => {
+    try {
+        const { kategori_id, cihaz_adi, marka, model, seri_no, envanter_no, olcme_araligi, kalibrasyon_kriteri, ara_kontrol_kriteri } = req.body;
+        const query = `INSERT INTO referans_cihazlar (kategori_id, cihaz_adi, marka, model, seri_no, envanter_no, olcme_araligi, kalibrasyon_kriteri, ara_kontrol_kriteri) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`;
+        const result = await pool.query(query, [kategori_id, cihaz_adi, marka, model, seri_no, envanter_no, olcme_araligi, kalibrasyon_kriteri, ara_kontrol_kriteri]);
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/referans-cihazlar/:id', async (req, res) => {
+    try {
+        const { kategori_id, cihaz_adi, marka, model, seri_no, envanter_no, olcme_araligi, kalibrasyon_kriteri, ara_kontrol_kriteri } = req.body;
+        const query = `UPDATE referans_cihazlar SET kategori_id=$1, cihaz_adi=$2, marka=$3, model=$4, seri_no=$5, envanter_no=$6, olcme_araligi=$7, kalibrasyon_kriteri=$8, ara_kontrol_kriteri=$9 WHERE id=$10 RETURNING *`;
+        const result = await pool.query(query, [kategori_id, cihaz_adi, marka, model, seri_no, envanter_no, olcme_araligi, kalibrasyon_kriteri, ara_kontrol_kriteri, req.params.id]);
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/referans-cihazlar/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM referans_cihazlar WHERE id=$1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/referans-takip-guncelle', async (req, res) => {
+    try {
+        const { id, sertifika_no, izlenebilirlik, kal_tarihi, sonraki_kal_tarihi } = req.body;
+        const query = `
+            UPDATE referans_takip 
+            SET sertifika_no = $2, izlenebilirlik = $3, kal_tarihi = $4, sonraki_kal_tarihi = $5 
+            WHERE id = $1 RETURNING *`;
+        const result = await pool.query(query, [id, sertifika_no, izlenebilirlik, kal_tarihi, sonraki_kal_tarihi]);
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Cihazın Tüm Tarihçesini Getir (Tıklayınca açılan kısım için KRİTİK)
+app.get('/api/referans-tarihce/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        // Sorguya rt.id'yi ekledik
+        const query = `SELECT id, islem_tipi, sertifika_no, izlenebilirlik, kal_tarihi, sonraki_kal_tarihi 
+                       FROM referans_takip 
+                       WHERE referans_id = $1 
+                       ORDER BY kal_tarihi DESC`;
+        const result = await pool.query(query, [id]);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/metot-yardimci-veriler', async (req, res) => {
+    try {
+        // Tablo adını 'talimatlar' olarak güncelledik
+        const talimatlar = await pool.query('SELECT id, talimat_adi, talimat_kodu FROM talimatlar');
+        
+        // Referanslar (En güncel SKT ile)
+        const referanslar = await pool.query(`
+            SELECT rc.id, rc.cihaz_adi, rc.seri_no, rt.sonraki_kal_tarihi
+            FROM referans_cihazlar rc
+            LEFT JOIN (
+                SELECT DISTINCT ON (referans_id) referans_id, sonraki_kal_tarihi 
+                FROM referans_takip 
+                ORDER BY referans_id, kal_tarihi DESC
+            ) rt ON rc.id = rt.referans_id
+        `);
+
+        res.json({
+            talimatlar: talimatlar.rows,
+            referanslar: referanslar.rows
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+// --- KALİBRASYON METOTLARI API ---
+
+// LİSTELE
+app.get('/api/metotlar', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT km.*, 
+                COALESCE(
+                    (SELECT json_agg(json_build_object('id', t.id, 'talimat_kodu', t.talimat_kodu, 'talimat_adi', t.talimat_adi))
+                     FROM talimatlar t WHERE t.id = ANY(km.talimatlar)), '[]'
+                ) as talimat_detay,
+                COALESCE(
+                    (SELECT json_agg(json_build_object('id', rc.id, 'cihaz_adi', rc.cihaz_adi, 'seri_no', rc.seri_no))
+                     FROM referans_cihazlar rc WHERE rc.id = ANY(km.referanslar)), '[]'
+                ) as referans_detay
+            FROM kalibrasyon_metotlari km
+            ORDER BY km.id DESC
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// KAYDET
+app.post('/api/metotlar', async (req, res) => {
+    try {
+        const { metot_adi, metot_kodu, talimatlar, referanslar } = req.body;
+        const result = await pool.query(
+            `INSERT INTO kalibrasyon_metotlari (metot_adi, metot_kodu, talimatlar, referanslar)
+             VALUES ($1, $2, $3, $4) RETURNING *`,
+            [metot_adi, metot_kodu, talimatlar.map(Number), referanslar.map(Number)]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GÜNCELLE
+app.put('/api/metotlar/:id', async (req, res) => {
+    try {
+        const { metot_adi, metot_kodu, talimatlar, referanslar } = req.body;
+        const result = await pool.query(
+            `UPDATE kalibrasyon_metotlari SET metot_adi=$1, metot_kodu=$2, talimatlar=$3, referanslar=$4 WHERE id=$5 RETURNING *`,
+            [metot_adi, metot_kodu, talimatlar.map(Number), referanslar.map(Number), req.params.id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// SİL
+app.delete('/api/metotlar/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM kalibrasyon_metotlari WHERE id=$1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+// --- MÜŞTERİ CİHAZLARI API ---
+
+app.get('/api/musteri-cihazlari-on-veriler', async (req, res) => {
+    try {
+        const musteriler = await pool.query('SELECT id, firma_adi FROM musteriler ORDER BY firma_adi ASC');
+        const kategoriler = await pool.query('SELECT id, kategori_adi FROM kategoriler ORDER BY kategori_adi ASC');
+        const cihazlar = await pool.query('SELECT id, cihaz_adi FROM cihaz_kutuphanesi ORDER BY cihaz_adi ASC');
+        const metotlar = await pool.query('SELECT id, metot_adi, metot_kodu FROM kalibrasyon_metotlari ORDER BY metot_kodu ASC');
+        res.json({ musteriler: musteriler.rows, kategoriler: kategoriler.rows, cihazlar: cihazlar.rows, metotlar: metotlar.rows });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/musteri-cihazlari/:id', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT mc.*, 
+                m.firma_adi,
+                k.kategori_adi,
+                km.metot_kodu,
+                km.metot_adi,
+                COALESCE(
+                    (SELECT json_agg(json_build_object('talimat_kodu', t.talimat_kodu, 'talimat_adi', t.talimat_adi))
+                     FROM talimatlar t WHERE t.id = ANY(km.talimatlar)), '[]'
+                ) as talimat_detay,
+                COALESCE(
+                    (SELECT json_agg(json_build_object('cihaz_adi', rc.cihaz_adi, 'marka', rc.marka, 'model', rc.model, 'seri_no', rc.seri_no, 'envanter_no', rc.envanter_no))
+                     FROM referans_cihazlar rc WHERE rc.id = ANY(km.referanslar)), '[]'
+                ) as referans_detay
+            FROM musteri_cihazlari mc
+            LEFT JOIN musteriler m ON mc.musteri_id = m.id
+            LEFT JOIN kategoriler k ON mc.kategori_id = k.id
+            LEFT JOIN kalibrasyon_metotlari km ON mc.metot_id = km.id
+            WHERE mc.id = $1
+        `, [req.params.id]);
+        if(!result.rows.length) return res.status(404).json({ error: 'Bulunamadı' });
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/musteri-cihazlari', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT mc.*, 
+                m.firma_adi, 
+                k.kategori_adi,
+                km.metot_kodu, km.metot_adi as metot_adi_full
+            FROM musteri_cihazlari mc
+            LEFT JOIN musteriler m ON mc.musteri_id = m.id
+            LEFT JOIN kategoriler k ON mc.kategori_id = k.id
+            LEFT JOIN kalibrasyon_metotlari km ON mc.metot_id = km.id
+            ORDER BY mc.id DESC
+        `);
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/musteri-cihazlari', async (req, res) => {
+    try {
+        const { musteri_id, kategori_id, cihaz_adi, marka, model, seri_no, envanter_no, olcum_araligi, cozunurluk, metot_id, degerlendirme_kriteri, kalibrasyon_yeri } = req.body;
+        const result = await pool.query(
+            `INSERT INTO musteri_cihazlari (musteri_id, kategori_id, cihaz_adi, marka, model, seri_no, envanter_no, olcum_araligi, cozunurluk, metot_id, degerlendirme_kriteri, kalibrasyon_yeri)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+            [musteri_id, kategori_id||null, cihaz_adi, marka, model, seri_no||null, envanter_no||null, olcum_araligi, cozunurluk, metot_id||null, degerlendirme_kriteri, kalibrasyon_yeri]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/musteri-cihazlari/:id', async (req, res) => {
+    try {
+        const { musteri_id, kategori_id, cihaz_adi, marka, model, seri_no, envanter_no, olcum_araligi, cozunurluk, metot_id, degerlendirme_kriteri, kalibrasyon_yeri } = req.body;
+        const result = await pool.query(
+            `UPDATE musteri_cihazlari SET musteri_id=$1, kategori_id=$2, cihaz_adi=$3, marka=$4, model=$5, seri_no=$6, envanter_no=$7, olcum_araligi=$8, cozunurluk=$9, metot_id=$10, degerlendirme_kriteri=$11, kalibrasyon_yeri=$12 WHERE id=$13 RETURNING *`,
+            [musteri_id, kategori_id||null, cihaz_adi, marka, model, seri_no||null, envanter_no||null, olcum_araligi, cozunurluk, metot_id||null, degerlendirme_kriteri, kalibrasyon_yeri, req.params.id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/musteri-cihazlari/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM musteri_cihazlari WHERE id=$1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- AYARLAR ---
+app.get('/api/ayarlar', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT anahtar, deger FROM ayarlar');
+        const ayarlar = {};
+        result.rows.forEach(r => ayarlar[r.anahtar] = r.deger);
+        res.json(ayarlar);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/ayarlar', async (req, res) => {
+    try {
+        const ayarlar = req.body;
+        for (const [anahtar, deger] of Object.entries(ayarlar)) {
+            await pool.query(
+                `INSERT INTO ayarlar (anahtar, deger) VALUES ($1, $2)
+                 ON CONFLICT (anahtar) DO UPDATE SET deger = $2`,
+                [anahtar, deger]
+            );
+        }
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- İŞ EMİRLERİ ---
+app.get('/api/is-emirleri-on-veriler', async (req, res) => {
+    try {
+        const [musteriler, personeller, teklifler] = await Promise.all([
+            pool.query('SELECT id, firma_adi, sube_adi FROM musteriler ORDER BY firma_adi'),
+            pool.query('SELECT id, ad_soyad, varsayilan_onaylayici FROM personeller ORDER BY ad_soyad'),
+            pool.query('SELECT id, teklif_no, musteri_id FROM teklifler ORDER BY id DESC')
+        ]);
+        res.json({ musteriler: musteriler.rows, personeller: personeller.rows, teklifler: teklifler.rows });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/is-emirleri', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT ie.*, m.firma_adi, m.sube_adi,
+                   t.teklif_no,
+                   p.ad_soyad as teslim_alan_adi
+            FROM is_emirleri ie
+            LEFT JOIN musteriler m ON ie.musteri_id = m.id
+            LEFT JOIN teklifler t ON ie.teklif_id = t.id
+            LEFT JOIN personeller p ON ie.teslim_alan_id = p.id
+            ORDER BY ie.olusturulma DESC`);
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/is-emirleri', async (req, res) => {
+    try {
+        const { musteri_id, kabul_tarihi, teslim_tarihi, cihazlar, notlar,
+                teklif_id, teslim_eden, teslim_alan_id } = req.body;
+        const yil = new Date().getFullYear();
+        const sayacRes = await pool.query(
+            `SELECT COUNT(*) FROM is_emirleri WHERE ie_no LIKE $1`, [`IE-${yil}-%`]);
+        const sira = parseInt(sayacRes.rows[0].count) + 1;
+        const ie_no = `IE-${yil}-${String(sira).padStart(3,'0')}`;
+        const result = await pool.query(
+            `INSERT INTO is_emirleri (ie_no, musteri_id, kabul_tarihi, teslim_tarihi, cihazlar, notlar, asama,
+             teklif_id, teslim_eden, teslim_alan_id)
+             VALUES ($1,$2,$3,$4,$5,$6,'kabul_edildi',$7,$8,$9) RETURNING *`,
+            [ie_no, musteri_id, kabul_tarihi, teslim_tarihi||null, JSON.stringify(cihazlar), notlar||'',
+             teklif_id||null, teslim_eden||null, teslim_alan_id||null]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/is-emirleri/:id/asama', async (req, res) => {
+    try {
+        const { asama } = req.body;
+        const result = await pool.query(
+            `UPDATE is_emirleri SET asama=$1 WHERE id=$2 RETURNING *`,
+            [asama, req.params.id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/is-emirleri/:id', async (req, res) => {
+    try {
+        const { musteri_id, kabul_tarihi, teslim_tarihi, cihazlar, notlar, asama,
+                teklif_id, teslim_eden, teslim_alan_id } = req.body;
+        const result = await pool.query(
+            `UPDATE is_emirleri SET musteri_id=$1, kabul_tarihi=$2, teslim_tarihi=$3, cihazlar=$4,
+             notlar=$5, asama=$6, teklif_id=$7, teslim_eden=$8, teslim_alan_id=$9 WHERE id=$10 RETURNING *`,
+            [musteri_id, kabul_tarihi, teslim_tarihi||null, JSON.stringify(cihazlar), notlar||'',
+             asama, teklif_id||null, teslim_eden||null, teslim_alan_id||null, req.params.id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/is-emirleri/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM is_emirleri WHERE id=$1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- DASHBOARD İSTATİSTİKLERİ ---
+app.get('/api/dashboard', async (req, res) => {
+    try {
+        const [kabulEdilenler, hazırlananlar, tamamlananlar, buYil, musteriler, referanslar, takvimleri] = await Promise.all([
+            pool.query(`SELECT COUNT(*) FROM is_emirleri WHERE asama='kabul_edildi'`),
+            pool.query(`SELECT COUNT(*) FROM is_emirleri WHERE asama IN ('hazırlanıyor','tamamlandı','imzalandı')`),
+            pool.query(`SELECT COUNT(*) FROM is_emirleri WHERE asama='onaylandı' OR asama='sertifika_gönderildi'`),
+            pool.query(`SELECT COUNT(*) FROM is_emirleri WHERE EXTRACT(YEAR FROM olusturulma)=EXTRACT(YEAR FROM NOW()) AND asama='sertifika_gönderildi'`),
+            pool.query(`SELECT COUNT(*) FROM musteriler`),
+            // Referans cihazlar: KALİBRASYON için 30 gün, ARA_KONTROL için 30 gün eşiği
+            pool.query(`
+                SELECT rc.cihaz_adi, rc.seri_no, rt.sonraki_kal_tarihi, rt.islem_tipi,
+                    (rt.sonraki_kal_tarihi - CURRENT_DATE) as kalan_gun
+                FROM referans_cihazlar rc
+                JOIN (
+                    SELECT DISTINCT ON (referans_id) referans_id, sonraki_kal_tarihi, islem_tipi
+                    FROM referans_takip ORDER BY referans_id, kal_tarihi DESC
+                ) rt ON rc.id = rt.referans_id
+                WHERE rt.sonraki_kal_tarihi <= CURRENT_DATE + INTERVAL '30 days'
+                ORDER BY rt.sonraki_kal_tarihi ASC
+                LIMIT 15`),
+            // Takvim: yarın başlayacak etkinlikler (1 gün kala bildirimi)
+            pool.query(`
+                SELECT t.*, p.ad_soyad as atanan_adi
+                FROM takvim t
+                LEFT JOIN personeller p ON t.atanan_id = p.id
+                WHERE t.baslangic = CURRENT_DATE + INTERVAL '1 day'
+                ORDER BY t.baslangic ASC`)
+        ]);
+        res.json({
+            kabul_edildi: parseInt(kabulEdilenler.rows[0].count),
+            kalibrasyonda: parseInt(hazırlananlar.rows[0].count),
+            onay_bekleyen: parseInt(tamamlananlar.rows[0].count),
+            bu_yil: parseInt(buYil.rows[0].count),
+            musteri_sayisi: parseInt(musteriler.rows[0].count),
+            yaklasan_aktiviteler: referanslar.rows,
+            yaklasan_etkinlikler: takvimleri.rows
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- TAKVİM ---
+app.get('/api/takvim', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT t.*, p.ad_soyad as atanan_adi
+            FROM takvim t
+            LEFT JOIN personeller p ON t.atanan_id = p.id
+            ORDER BY t.baslangic ASC`);
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/takvim', async (req, res) => {
+    try {
+        const { baslik, aciklama, baslangic, bitis, atanan_id, renk, tip } = req.body;
+        const result = await pool.query(
+            `INSERT INTO takvim (baslik, aciklama, baslangic, bitis, atanan_id, renk, tip, olusturan_id)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+            [baslik, aciklama||'', baslangic, bitis||baslangic, atanan_id||null, renk||'#1E40AF', tip||'genel', null]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/takvim/:id', async (req, res) => {
+    try {
+        const { baslik, aciklama, baslangic, bitis, atanan_id, renk, tip } = req.body;
+        const result = await pool.query(
+            `UPDATE takvim SET baslik=$1, aciklama=$2, baslangic=$3, bitis=$4, atanan_id=$5, renk=$6, tip=$7 WHERE id=$8 RETURNING *`,
+            [baslik, aciklama||'', baslangic, bitis||baslangic, atanan_id||null, renk||'#1E40AF', tip||'genel', req.params.id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/takvim/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM takvim WHERE id=$1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- PERSONEL YÖNETİMİ ---
+app.get('/api/personeller', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM personeller ORDER BY id DESC');
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/personeller', async (req, res) => {
+    try {
+        const { ad_soyad, kullanici_adi, sifre, roller, erisimler, varsayilan_onaylayici } = req.body;
+        if (varsayilan_onaylayici) {
+            await pool.query('UPDATE personeller SET varsayilan_onaylayici = false');
+        }
+        const result = await pool.query(
+            `INSERT INTO personeller (ad_soyad, kullanici_adi, sifre, roller, erisimler, varsayilan_onaylayici)
+             VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+            [ad_soyad, kullanici_adi, sifre, JSON.stringify(roller), JSON.stringify(erisimler), varsayilan_onaylayici]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        if (err.code === '23505') return res.status(400).json({ error: "Bu kullanıcı adı zaten kullanılıyor!" });
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/personeller/:id', async (req, res) => {
+    try {
+        const { ad_soyad, kullanici_adi, sifre, roller, erisimler, varsayilan_onaylayici } = req.body;
+        if (varsayilan_onaylayici) {
+            await pool.query('UPDATE personeller SET varsayilan_onaylayici = false');
+        }
+        const result = await pool.query(
+            `UPDATE personeller SET ad_soyad=$1, kullanici_adi=$2, sifre=$3, roller=$4, erisimler=$5, varsayilan_onaylayici=$6 WHERE id=$7 RETURNING *`,
+            [ad_soyad, kullanici_adi, sifre, JSON.stringify(roller), JSON.stringify(erisimler), varsayilan_onaylayici, req.params.id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        if (err.code === '23505') return res.status(400).json({ error: "Bu kullanıcı adı zaten kullanılıyor!" });
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/personeller/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM personeller WHERE id=$1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- GİRİŞ (LOGIN) ---
+app.post('/api/login', async (req, res) => {
+    try {
+        const { kullanici_adi, sifre } = req.body;
+        const result = await pool.query(
+            'SELECT id, ad_soyad, kullanici_adi, roller, erisimler FROM personeller WHERE kullanici_adi=$1 AND sifre=$2',
+            [kullanici_adi, sifre]
+        );
+        if (result.rows.length > 0) {
+            res.json({ success: true, user: result.rows[0] });
+        } else {
+            res.status(401).json({ success: false, error: "Kullanıcı adı veya şifre hatalı!" });
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.listen(PORT, () => {
+    console.log(`🚀 Sunucu ${PORT} portunda başarıyla ayağa kalktı.`);
+});
+
+// --- TÜRKAK API ---
+app.post('/api/turkak-token-test', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        if (!username || !password) 
+            return res.status(400).json({ error: "Kullanıcı adı ve şifre zorunludur!" });
+
+        const response = await fetch('https://api.turkak.org.tr/SSO/signin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ Username: username, Password: password })
+        });
+
+        if (!response.ok) 
+            return res.status(401).json({ error: "TÜRKAK kullanıcı adı veya şifre hatalı!" });
+
+        const data = await response.json();
+        const token = data.Token || data.token;
+
+        if (!token) 
+            return res.status(401).json({ error: "Token alınamadı. Bilgilerinizi kontrol edin." });
+
+        // Token'ı geçici olarak sakla (ayarlar tablosuna)
+        const zaman = new Date().toLocaleString('tr-TR');
+        await pool.query(
+            `INSERT INTO ayarlar (anahtar, deger) VALUES ($1, $2)
+             ON CONFLICT (anahtar) DO UPDATE SET deger = $2`,
+            ['turkak_token', token]
+        );
+        await pool.query(
+            `INSERT INTO ayarlar (anahtar, deger) VALUES ($1, $2)
+             ON CONFLICT (anahtar) DO UPDATE SET deger = $2`,
+            ['turkak_token_zaman', zaman]
+        );
+
+        res.json({ success: true, zaman });
+    } catch (err) { 
+        res.status(500).json({ error: "TÜRKAK sunucusuna ulaşılamadı: " + err.message }); 
+    }
+});
+
+// Token yenile (12 saatte bir çağrılır)
+app.post('/api/turkak-token-yenile', async (req, res) => {
+    try {
+        const result = await pool.query(
+            "SELECT deger FROM ayarlar WHERE anahtar IN ('turkak_username','turkak_password')"
+        );
+        const ayarlar = {};
+        result.rows.forEach(r => ayarlar[r.anahtar] = r.deger);
+
+        if (!ayarlar.turkak_username || !ayarlar.turkak_password)
+            return res.status(400).json({ error: "Türkak bilgileri kayıtlı değil!" });
+
+        const response = await fetch('https://api.turkak.org.tr/SSO/signin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                Username: ayarlar.turkak_username, 
+                Password: ayarlar.turkak_password 
+            })
+        });
+
+        const data = await response.json();
+        const token = data.Token || data.token;
+        if (!token) return res.status(401).json({ error: "Token yenilenemedi!" });
+
+        const zaman = new Date().toLocaleString('tr-TR');
+        await pool.query(
+            `INSERT INTO ayarlar (anahtar, deger) VALUES ('turkak_token', $1)
+             ON CONFLICT (anahtar) DO UPDATE SET deger = $1`, [token]);
+        await pool.query(
+            `INSERT INTO ayarlar (anahtar, deger) VALUES ('turkak_token_zaman', $1)
+             ON CONFLICT (anahtar) DO UPDATE SET deger = $1`, [zaman]);
+
+        res.json({ success: true, zaman });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Aktif token getir
+app.get('/api/turkak-token', async (req, res) => {
+    try {
+        const result = await pool.query(
+            "SELECT deger FROM ayarlar WHERE anahtar='turkak_token'"
+        );
+        if (!result.rows.length) 
+            return res.status(404).json({ error: "Token bulunamadı. Ayarlardan bağlantı kurun." });
+        res.json({ token: result.rows[0].deger });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- ÇEVRE KOŞULLARI ---
+app.get('/api/cevre-kosullari', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT ck.*, k.kategori_adi
+            FROM cevre_kosullari ck
+            LEFT JOIN kategoriler k ON ck.kategori_id = k.id
+            ORDER BY k.kategori_adi ASC`);
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/cevre-kosullari/kategori/:kategori_id', async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT ck.*, k.kategori_adi FROM cevre_kosullari ck
+             LEFT JOIN kategoriler k ON ck.kategori_id = k.id
+             WHERE ck.kategori_id = $1`,
+            [req.params.kategori_id]
+        );
+        res.json(result.rows[0] || null);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/cevre-kosullari', async (req, res) => {
+    try {
+        const { kategori_id, sicaklik_merkez, sicaklik_tolerans,
+                nem_merkez, nem_tolerans, basinc_merkez, basinc_tolerans } = req.body;
+        const result = await pool.query(
+            `INSERT INTO cevre_kosullari
+             (kategori_id, sicaklik_merkez, sicaklik_tolerans, nem_merkez, nem_tolerans, basinc_merkez, basinc_tolerans)
+             VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+            [kategori_id, sicaklik_merkez||null, sicaklik_tolerans||null,
+             nem_merkez||null, nem_tolerans||null, basinc_merkez||null, basinc_tolerans||null]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/cevre-kosullari/:id', async (req, res) => {
+    try {
+        const { kategori_id, sicaklik_merkez, sicaklik_tolerans,
+                nem_merkez, nem_tolerans, basinc_merkez, basinc_tolerans } = req.body;
+        const result = await pool.query(
+            `UPDATE cevre_kosullari SET
+             kategori_id=$1, sicaklik_merkez=$2, sicaklik_tolerans=$3,
+             nem_merkez=$4, nem_tolerans=$5, basinc_merkez=$6, basinc_tolerans=$7
+             WHERE id=$8 RETURNING *`,
+            [kategori_id, sicaklik_merkez||null, sicaklik_tolerans||null,
+             nem_merkez||null, nem_tolerans||null, basinc_merkez||null, basinc_tolerans||null,
+             req.params.id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/cevre-kosullari/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM cevre_kosullari WHERE id=$1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+
+// SMTP transporter oluştur (ayarlardan)
+async function smtpTransporter() {
+    const res = await pool.query(
+        "SELECT anahtar, deger FROM ayarlar WHERE anahtar IN ('smtp_host','smtp_port','smtp_user','smtp_pass','smtp_from_name','smtp_secure')"
+    );
+    const a = {};
+    res.rows.forEach(r => a[r.anahtar] = r.deger);
+    if(!a.smtp_host || !a.smtp_user || !a.smtp_pass)
+        throw new Error('SMTP ayarları eksik. Lütfen Ayarlar sayfasından yapılandırın.');
+    return nodemailer.createTransport({
+        host: a.smtp_host,
+        port: parseInt(a.smtp_port || '587'),
+        secure: a.smtp_secure === 'true',
+        auth: { user: a.smtp_user, pass: a.smtp_pass }
+    });
+}
+
+// --- SERTİFİKALAR ---
+app.get('/api/sertifikalar', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT 
+                s.id, s.ie_id, s.ie_no, s.musteri_id, s.cihaz_index,
+                s.cihaz_adi, s.imalatci, s.tip, s.seri_no, s.envanter_no,
+                s.fis_no, s.kal_yeri, s.sertifika_tipi, s.sertifika_no,
+                s.kal_tarihi, s.yayin_tarihi, s.onay_tarihi, s.gelecek_kal,
+                s.kal_yapan_id, s.onaylayan_id, s.sicaklik, s.nem, s.basinc,
+                s.uygunluk, s.yorum, s.asama, s.olusturulma,
+                s.olcum_pdf_sayfa,
+                -- PDF var mı bilgisi (base64 verisi değil)
+                CASE WHEN s.olcum_pdf_url IS NOT NULL AND s.olcum_pdf_url != '' 
+                     THEN true ELSE false END as olcum_pdf_var,
+                CASE WHEN s.sertifika_pdf IS NOT NULL AND s.sertifika_pdf != '' 
+                     THEN true ELSE false END as imzali_pdf_var,
+                m.firma_adi, m.sube_adi,
+                p1.ad_soyad as kal_yapan_adi,
+                p2.ad_soyad as onaylayan_adi
+            FROM sertifikalar s
+            LEFT JOIN musteriler m ON s.musteri_id = m.id
+            LEFT JOIN personeller p1 ON s.kal_yapan_id = p1.id
+            LEFT JOIN personeller p2 ON s.onaylayan_id = p2.id
+            ORDER BY s.olusturulma DESC`);
+        res.json(result.rows);
+    } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/sertifikalar', async (req, res) => {
+    try {
+        const { ie_id, ie_no, musteri_id, cihaz_index, cihaz_adi, imalatci, tip,
+                seri_no, envanter_no, fis_no, kal_yeri, sertifika_tipi,
+                kal_tarihi, yayin_tarihi, onay_tarihi, gelecek_kal,
+                kal_yapan_id, onaylayan_id, sicaklik, nem, basinc,
+                uygunluk, yorum, asama } = req.body;
+
+        // Aynı iş emri + cihaz index için sertifika var mı kontrol
+        const mevcut = await pool.query(
+            'SELECT id FROM sertifikalar WHERE ie_id=$1 AND cihaz_index=$2',
+            [ie_id, cihaz_index]
+        );
+        if(mevcut.rows.length)
+            return res.status(400).json({ error: "Bu cihaz için zaten sertifika mevcut! Düzenleme yapın." });
+
+        const result = await pool.query(`
+            INSERT INTO sertifikalar
+            (ie_id, ie_no, musteri_id, cihaz_index, cihaz_adi, imalatci, tip,
+             seri_no, envanter_no, fis_no, kal_yeri, sertifika_tipi,
+             kal_tarihi, yayin_tarihi, onay_tarihi, gelecek_kal,
+             kal_yapan_id, onaylayan_id, sicaklik, nem, basinc,
+             uygunluk, yorum, asama)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+            RETURNING *`,
+            [ie_id, ie_no, musteri_id, cihaz_index, cihaz_adi, imalatci, tip,
+             seri_no, envanter_no||null, fis_no, kal_yeri, sertifika_tipi,
+             kal_tarihi, yayin_tarihi, onay_tarihi, gelecek_kal||null,
+             kal_yapan_id||null, onaylayan_id||null, sicaklik, nem, basinc,
+             uygunluk, yorum||null, asama||'hazırlanıyor']
+        );
+        res.json(result.rows[0]);
+    } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/sertifikalar/:id', async (req, res) => {
+    try {
+        const { cihaz_adi, imalatci, tip, seri_no, envanter_no, fis_no, kal_yeri,
+                sertifika_tipi, kal_tarihi, yayin_tarihi, onay_tarihi, gelecek_kal,
+                kal_yapan_id, onaylayan_id, sicaklik, nem, basinc, uygunluk, yorum } = req.body;
+        const result = await pool.query(`
+            UPDATE sertifikalar SET
+            cihaz_adi=$1, imalatci=$2, tip=$3, seri_no=$4, envanter_no=$5,
+            fis_no=$6, kal_yeri=$7, sertifika_tipi=$8, kal_tarihi=$9,
+            yayin_tarihi=$10, onay_tarihi=$11, gelecek_kal=$12,
+            kal_yapan_id=$13, onaylayan_id=$14, sicaklik=$15, nem=$16,
+            basinc=$17, uygunluk=$18, yorum=$19
+            WHERE id=$20 RETURNING *`,
+            [cihaz_adi, imalatci, tip, seri_no, envanter_no||null,
+             fis_no, kal_yeri, sertifika_tipi, kal_tarihi,
+             yayin_tarihi, onay_tarihi, gelecek_kal||null,
+             kal_yapan_id||null, onaylayan_id||null, sicaklik, nem,
+             basinc, uygunluk, yorum||null, req.params.id]
+        );
+        res.json(result.rows[0]);
+    } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/sertifikalar/:id/asama', async (req, res) => {
+    try {
+        const { asama } = req.body;
+        const result = await pool.query(
+            'UPDATE sertifikalar SET asama=$1 WHERE id=$2 RETURNING *',
+            [asama, req.params.id]
+        );
+        res.json(result.rows[0]);
+    } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/sertifikalar/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM sertifikalar WHERE id=$1', [req.params.id]);
+        res.json({ success: true });
+    } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// Sertifika tam veri (önizleme için)
+app.get('/api/sertifikalar/:id/tam', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT s.*,
+                m.firma_adi, m.adres as firma_adres_ham, m.il, m.ilce,
+                p1.ad_soyad as kal_yapan_adi,
+                p2.ad_soyad as onaylayan_adi,
+                mc.kalibrasyon_yeri,
+                COALESCE(
+                    (SELECT json_agg(json_build_object('talimat_kodu', t.talimat_kodu, 'talimat_adi', t.talimat_adi))
+                     FROM talimatlar t WHERE t.id = ANY(km.talimatlar)), '[]'
+                ) as talimat_detay,
+                COALESCE(
+                    (SELECT json_agg(json_build_object(
+                        'cihaz_adi', rc.cihaz_adi, 'marka', rc.marka, 'model', rc.model,
+                        'seri_no', rc.seri_no, 'envanter_no', rc.envanter_no
+                    ))
+                    FROM referans_cihazlar rc WHERE rc.id = ANY(km.referanslar)), '[]'
+                ) as referans_detay
+            FROM sertifikalar s
+            LEFT JOIN musteriler m ON s.musteri_id = m.id
+            LEFT JOIN personeller p1 ON s.kal_yapan_id = p1.id
+            LEFT JOIN personeller p2 ON s.onaylayan_id = p2.id
+            LEFT JOIN is_emirleri ie ON s.ie_id = ie.id
+            LEFT JOIN musteri_cihazlari mc ON (ie.cihazlar->s.cihaz_index->>'musteri_cihaz_id')::int = mc.id
+            LEFT JOIN kalibrasyon_metotlari km ON mc.metot_id = km.id
+            WHERE s.id = $1
+        `, [req.params.id]);
+        if(!result.rows.length) return res.status(404).json({ error: 'Bulunamadı' });
+        const row = result.rows[0];
+        // Firma adres birleştir
+        const adresParcalar = [];
+        if(row.firma_adres_ham) adresParcalar.push(row.firma_adres_ham);
+        const ilIlce = [row.ilce, row.il].filter(Boolean).join(' / ');
+        if(ilIlce) adresParcalar.push(ilIlce);
+        row.firma_adres = adresParcalar.join(' - ');
+        res.json(row);
+    } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// Sertifika PDF üret (Puppeteer)
+app.get('/api/sertifikalar/:id/pdf', async (req, res) => {
+    let browser;
+    try {
+        // Ölçüm PDF'ini DB'den çek
+        const sertRow = await pool.query(
+            'SELECT olcum_pdf_url, sertifika_no, cihaz_adi FROM sertifikalar WHERE id=$1',
+            [req.params.id]
+        );
+        if(!sertRow.rows.length) return res.status(404).json({ error: 'Sertifika bulunamadı' });
+        const sert = sertRow.rows[0];
+
+        // S1+S2 HTML → PDF (Puppeteer)
+        const onizleUrl = `${req.protocol}://${req.get('host')}/sertifika-onizle.html?id=${req.params.id}&print=1`;
+        // Railway'de sistem Chromium'unu kullan
+        const execPath = process.env.CHROMIUM_PATH || 
+            require('child_process').execSync('which chromium || which chromium-browser || which google-chrome || echo ""')
+            .toString().trim() || await chromium.executablePath();
+
+        browser = await puppeteer.launch({
+            executablePath: execPath,
+            headless: 'new',
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process',
+                '--disable-extensions',
+            ],
+        });
+        const page = await browser.newPage();
+        await page.setViewport({ width: 794, height: 1123 });
+        await page.goto(onizleUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+        await page.waitForSelector('.a4', { timeout: 10000 }).catch(()=>{});
+        await new Promise(r => setTimeout(r, 1500));
+
+        const s1s2Buffer = await page.pdf({
+            format: 'A4',
+            margin: { top: '0', right: '0', bottom: '0', left: '0' },
+            printBackground: true,
+            preferCSSPageSize: true,
+        });
+        await browser.close();
+        browser = null;
+
+        let sonPdfBuffer;
+
+        // Ölçüm PDF varsa birleştir
+        if(sert.olcum_pdf_url) {
+            const olcumBytes = Buffer.from(sert.olcum_pdf_url, 'base64');
+            const birlesikDoc = await PDFDocument.create();
+
+            // S1+S2 sayfaları ekle
+            const s1s2Doc = await PDFDocument.load(s1s2Buffer);
+            const s1s2Pages = await birlesikDoc.copyPages(s1s2Doc, s1s2Doc.getPageIndices());
+            s1s2Pages.forEach(p => birlesikDoc.addPage(p));
+
+            // Ölçüm PDF sayfaları ekle
+            const olcumDoc = await PDFDocument.load(olcumBytes);
+            const olcumPages = await birlesikDoc.copyPages(olcumDoc, olcumDoc.getPageIndices());
+            olcumPages.forEach(p => birlesikDoc.addPage(p));
+
+            const birlesikBytes = await birlesikDoc.save();
+            sonPdfBuffer = Buffer.from(birlesikBytes);
+        } else {
+            sonPdfBuffer = s1s2Buffer;
+        }
+
+        // DB'ye kaydet
+        await pool.query(
+            'UPDATE sertifikalar SET sertifika_pdf=$1 WHERE id=$2',
+            [sonPdfBuffer.toString('base64'), req.params.id]
+        );
+
+        const dosyaAdi = `sertifika-${sert.sertifika_no || req.params.id}.pdf`;
+        const preview = req.query.preview === '1';
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `${preview ? 'inline' : 'attachment'}; filename="${dosyaAdi}"`);
+        res.send(sonPdfBuffer);
+
+    } catch(err) {
+        if(browser) await browser.close().catch(()=>{});
+        console.error('PDF üretim hata:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// QR kod üret (sertifika görüntüleme linki)
+app.get('/api/sertifikalar/:id/qr', async (req, res) => {
+    try {
+        const host = `${req.protocol}://${req.get('host')}`;
+        // QR → direkt PDF indir
+        const url  = `${host}/api/sertifikalar/${req.params.id}/pdf`;
+        const qrDataUrl = await QRCode.toDataURL(url, {
+            width: 120, margin: 1,
+            color: { dark: '#000000', light: '#ffffff' }
+        });
+        res.json({ qr: qrDataUrl, url });
+    } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// Ölçüm PDF yükle
+app.post('/api/sertifikalar/:id/olcum-pdf', async (req, res) => {
+    try {
+        const { pdf_base64, sayfa_sayisi } = req.body;
+        if(!pdf_base64) return res.status(400).json({ error: 'PDF verisi eksik' });
+        // R2'ye yükle, DB'ye sadece key kaydet
+        const key = `olcum/${req.params.id}_olcum.pdf`;
+        const buffer = Buffer.from(pdf_base64, 'base64');
+        await r2Yukle(key, buffer);
+        const result = await pool.query(
+            `UPDATE sertifikalar SET olcum_pdf_url=$1, olcum_pdf_sayfa=$2 WHERE id=$3 RETURNING id, olcum_pdf_sayfa`,
+            [key, sayfa_sayisi||0, req.params.id]
+        );
+        res.json(result.rows[0]);
+    } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// Ölçüm PDF getir (önizleme)
+app.get('/api/sertifikalar/:id/olcum-pdf', async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT olcum_pdf_url, olcum_pdf_sayfa FROM sertifikalar WHERE id=$1',
+            [req.params.id]
+        );
+        if(!result.rows.length) return res.status(404).json({ error: 'Bulunamadı' });
+        const row = result.rows[0];
+        if(!row.olcum_pdf_url) return res.status(404).json({ error: 'PDF yok' });
+        const buffer = await r2Indir(row.olcum_pdf_url);
+        res.json({ olcum_pdf_url: buffer.toString('base64'), olcum_pdf_sayfa: row.olcum_pdf_sayfa });
+    } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// SMTP test endpoint
+app.post('/api/smtp-test', async (req, res) => {
+    try {
+        const ayarRes = await pool.query(
+            "SELECT anahtar, deger FROM ayarlar WHERE anahtar IN ('smtp_user','smtp_from_name','lab_adi')"
+        );
+        const a = {};
+        ayarRes.rows.forEach(r => a[r.anahtar] = r.deger);
+        const transporter = await smtpTransporter();
+        await transporter.sendMail({
+            from: `"${a.smtp_from_name||a.lab_adi||'LabQMS'}" <${a.smtp_user}>`,
+            to: a.smtp_user,
+            subject: 'LabQMS Pro - SMTP Test',
+            html: '<p>SMTP bağlantısı başarılı! LabQMS Pro mail sistemi çalışıyor.</p>'
+        });
+        res.json({ ok: true });
+    } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// Mail gönder (tek) - nodemailer + R2 imzalı PDF
+app.post('/api/sertifika-mail/:id', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT s.id, s.asama, s.sertifika_pdf, s.sertifika_no, s.cihaz_adi,
+                   s.imalatci, s.seri_no, s.envanter_no, s.kal_tarihi,
+                   m.firma_adi, m.sube_adi, m.sertifika_mailleri
+            FROM sertifikalar s
+            LEFT JOIN musteriler m ON s.musteri_id = m.id
+            WHERE s.id=$1`, [req.params.id]);
+
+        if(!result.rows.length) return res.status(404).json({ error: 'Sertifika bulunamadı' });
+        const s = result.rows[0];
+
+        if(!s.sertifika_pdf)
+            return res.status(400).json({ error: 'Bu sertifika henüz imzalanmamış!' });
+        if(s.asama !== 'onaylandı')
+            return res.status(400).json({ error: `Sertifika onaylanmamış (${s.asama})` });
+
+        const mailler = s.sertifika_mailleri || [];
+        if(!mailler.length)
+            return res.status(400).json({ error: 'Müşteri sertifika mail adresi tanımlı değil!' });
+
+        const ayarRes = await pool.query(
+            "SELECT anahtar, deger FROM ayarlar WHERE anahtar IN ('lab_adi','smtp_user','smtp_from_name')"
+        );
+        const ayar = {};
+        ayarRes.rows.forEach(r => ayar[r.anahtar] = r.deger);
+
+        // İmzalı PDF R2'den indir
+        const pdfBuffer = await r2Indir(s.sertifika_pdf);
+
+        const firmaAdi = s.sube_adi ? `${s.firma_adi} - ${s.sube_adi}` : s.firma_adi;
+        const kalTarihi = s.kal_tarihi ? new Date(s.kal_tarihi).toLocaleDateString('tr-TR') : '-';
+        const labAdi = ayar.lab_adi || 'Kalibrasyon Laboratuvarı';
+
+        const htmlIcerik = `
+        <div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:20px;">
+            <div style="background:#1E40AF;color:white;padding:20px;border-radius:8px 8px 0 0;">
+                <h2 style="margin:0;">${labAdi}</h2>
+                <p style="margin:5px 0 0;">Kalibrasyon Sertifikası Bildirimi</p>
+            </div>
+            <div style="background:#f8fafc;padding:20px;border:1px solid #e2e8f0;">
+                <p>Sayın <strong>${firmaAdi}</strong>,</p>
+                <p>Aşağıda bilgileri yer alan cihazınıza ait kalibrasyon sertifikasına ulaşabilirsiniz.</p>
+                <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+                    <tr style="background:#1E40AF;color:white;">
+                        <th style="padding:10px;text-align:left;">Cihaz</th>
+                        <th style="padding:10px;text-align:left;">Marka/Model</th>
+                        <th style="padding:10px;text-align:left;">Seri No</th>
+                        <th style="padding:10px;text-align:left;">Envanter No</th>
+                        <th style="padding:10px;text-align:left;">Kal. Tarihi</th>
+                        <th style="padding:10px;text-align:center;">Sertifika No</th>
+                    </tr>
+                    <tr style="background:white;">
+                        <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${s.cihaz_adi||'-'}</td>
+                        <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${s.imalatci||'-'}</td>
+                        <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${s.seri_no||'-'}</td>
+                        <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${s.envanter_no||'-'}</td>
+                        <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${kalTarihi}</td>
+                        <td style="padding:10px;border-bottom:1px solid #e2e8f0;text-align:center;"><strong>${s.sertifika_no||'-'}</strong></td>
+                    </tr>
+                </table>
+                <p style="color:#64748b;font-size:0.85rem;">Sertifika PDF dosyası bu mailin ekinde bulunmaktadır.</p>
+            </div>
+            <div style="background:#e2e8f0;padding:12px;border-radius:0 0 8px 8px;text-align:center;font-size:0.8rem;color:#64748b;">
+                ${labAdi} | Bu mail otomatik gönderilmiştir.
+            </div>
+        </div>`;
+
+        const transporter = await smtpTransporter();
+        await transporter.sendMail({
+            from: `"${ayar.smtp_from_name||labAdi}" <${ayar.smtp_user}>`,
+            to: mailler.join(', '),
+            subject: `Kalibrasyon Sertifikası - ${s.sertifika_no||s.cihaz_adi} - ${firmaAdi}`,
+            html: htmlIcerik,
+            attachments: [{
+                filename: `Sertifika_${s.sertifika_no||s.id}.pdf`,
+                content: pdfBuffer,
+                contentType: 'application/pdf'
+            }]
+        });
+
+        await pool.query(
+            "UPDATE sertifikalar SET asama='sertifika_gönderildi' WHERE id=$1",
+            [req.params.id]
+        );
+
+        res.json({ success: true, mesaj: `Mail ${mailler.join(', ')} adresine gönderildi.` });
+    } catch(err) {
+        console.error('Mail gönderme hata:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Mail gönder (toplu)
+
+
+// Sertifika numarası otomatik üret
+app.post('/api/sertifika-no-uret', async (req, res) => {
+    try {
+        const { sertifika_id } = req.body;
+
+        // Ayarlardan format ve sayac al
+        const ayarlar = await pool.query(
+            "SELECT anahtar, deger FROM ayarlar WHERE anahtar IN ('kd_format','kd_sayac','kd_basamak','akreditasyon_no')"
+        );
+        const ayar = {};
+        ayarlar.rows.forEach(r => ayar[r.anahtar] = r.deger);
+
+        const format   = ayar.kd_format  || 'SERT-{YIL}-{SAYI}';
+        const basamak  = parseInt(ayar.kd_basamak || '3');
+        const mevcutSayac = parseInt(ayar.kd_sayac || '0');
+        const yeniSayac   = mevcutSayac + 1;
+
+        // Formatı doldur
+        const yil  = new Date().getFullYear();
+        const ay   = String(new Date().getMonth() + 1).padStart(2, '0');
+        const sayi = String(yeniSayac).padStart(basamak, '0');
+
+        let sertNo = format
+            .replace(/{YIL}/g, yil)
+            .replace(/{YY}/g, String(yil).slice(-2))
+            .replace(/{AY}/g, ay)
+            .replace(/{SAYI}/g, sayi);
+
+        // Sayacı güncelle
+        await pool.query(
+            "INSERT INTO ayarlar (anahtar, deger) VALUES ('kd_sayac', $1) ON CONFLICT (anahtar) DO UPDATE SET deger=$1",
+            [String(yeniSayac)]
+        );
+
+        // Sertifikaya no ata
+        if (sertifika_id) {
+            await pool.query(
+                'UPDATE sertifikalar SET sertifika_no=$1 WHERE id=$2',
+                [sertNo, sertifika_id]
+            );
+        }
+
+        res.json({ sertifika_no: sertNo, sayac: yeniSayac });
+
+    } catch (err) {
+        console.error('Sertifika no üretme hata:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+// İmzalı PDF'i base64 olarak döndür (onaylama imzası için)
+app.get('/api/sertifikalar/:id/imzali-pdf', async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT sertifika_pdf, sertifika_no, asama FROM sertifikalar WHERE id=$1',
+            [req.params.id]
+        );
+        if(!result.rows.length) return res.status(404).json({ error: 'Sertifika bulunamadı' });
+        const s = result.rows[0];
+        if(!s.sertifika_pdf) return res.status(404).json({ error: 'İmzalı PDF bulunamadı' });
+        if(!['imzalandı','onaylandı','sertifika_gönderildi'].includes(s.asama)) 
+            return res.status(400).json({ error: 'Sertifika henüz imzalanmamış' });
+        const buffer = await r2Indir(s.sertifika_pdf);
+        res.json({ pdf_base64: buffer.toString('base64'), sertifika_no: s.sertifika_no });
+    } catch(err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// EronSign - İmzalı PDF yükle ve aşamayı güncelle
+app.post('/api/imzali-pdf-yukle', async (req, res) => {
+    try {
+        const { sertifika_id, pdf_base64, dosya_adi } = req.body;
+        if (!sertifika_id || !pdf_base64) {
+            return res.status(400).json({ error: 'sertifika_id ve pdf_base64 zorunlu' });
+        }
+
+        // Mevcut aşamayı öğren
+        const mevcut = await pool.query('SELECT asama FROM sertifikalar WHERE id=$1', [sertifika_id]);
+        if (!mevcut.rows.length) return res.status(404).json({ error: 'Sertifika bulunamadı' });
+
+        const mevcutAsama = mevcut.rows[0].asama;
+
+        // Aşama geçişi: hazırlanıyor → imzalandı, imzalandı → onaylandı
+        let yeniAsama = mevcutAsama;
+        if (mevcutAsama === 'hazırlanıyor') yeniAsama = 'imzalandı';
+        else if (mevcutAsama === 'imzalandı') yeniAsama = 'onaylandı';
+
+        // R2'ye yükle, DB'ye key kaydet
+        const imzaKey = `imzali/${sertifika_id}_${yeniAsama.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+        await r2Yukle(imzaKey, Buffer.from(pdf_base64, 'base64'));
+        await pool.query(
+            'UPDATE sertifikalar SET sertifika_pdf=$1, asama=$2 WHERE id=$3',
+            [imzaKey, yeniAsama, sertifika_id]
+        );
+
+        console.log(`[EronSign] Sertifika #${sertifika_id}: ${mevcutAsama} → ${yeniAsama}`);
+        res.json({ ok: true, sertifika_id, eski_asama: mevcutAsama, yeni_asama: yeniAsama });
+
+    } catch (err) {
+        console.error('İmzalı PDF yükleme hata:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/sertifika-mail-toplu', async (req, res) => {
+    try {
+        const { idler } = req.body;
+        await pool.query(
+            "UPDATE sertifikalar SET asama='sertifika_gönderildi' WHERE id=ANY($1)",
+            [idler]
+        );
+        res.json({ success: true, basarili: idler.length });
+    } catch(err) { res.status(500).json({ error: err.message }); }
+});

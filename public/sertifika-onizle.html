@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Sertifika Önizleme</title>
+<style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+    body { font-family:'Noto Sans', Arial, sans-serif; background:#e5e7eb; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    * { -webkit-font-smoothing: antialiased; }
+
+    /* ARAÇ ÇUBUĞU */
+    .toolbar { position:fixed; top:0; left:0; right:0; background:#1e293b; color:white; padding:10px 20px; display:flex; align-items:center; justify-content:space-between; z-index:1000; gap:12px; }
+    .toolbar-left { display:flex; align-items:center; gap:12px; font-size:0.88rem; }
+    .toolbar-right { display:flex; gap:8px; }
+    .btn-yazdir { background:#1E40AF; color:white; border:none; padding:8px 18px; border-radius:7px; font-weight:700; cursor:pointer; font-size:0.87rem; }
+    .btn-kapat  { background:#475569; color:white; border:none; padding:8px 14px; border-radius:7px; font-weight:600; cursor:pointer; font-size:0.87rem; }
+    .sayfa-bilgi { font-size:0.8rem; color:#94a3b8; }
+
+    /* SAYFA WRAPPER */
+    .sayfa-ici { padding: 80px 20px 40px; display:flex; flex-direction:column; align-items:center; gap:24px; }
+
+    /* A4 SAYFA */
+    .a4 { width:210mm; background:white; padding:12mm 15mm 10mm; box-shadow:0 4px 24px rgba(0,0,0,0.15); position:relative; }
+    @media print {
+        html, body { margin:0; padding:0; background:white; width:210mm; }
+        .toolbar { display:none !important; }
+        .sayfa-ici { padding:0 !important; gap:0 !important; background:white; }
+        .a4 { width:210mm !important; box-shadow:none; margin:0 !important;
+              padding:12mm 15mm 10mm !important;
+              page-break-after:always; break-after:page;
+              page-break-inside:avoid; break-inside:avoid; }
+        @page { size:210mm 297mm; margin:0; }
+    }
+
+    /* RENKLer */
+    :root { --lacivert:#1E3A5F; --koyu:#222222; --orta:#555555; --acik:#F7F7F7; --sinir:#CCCCCC; --kirmizi:#CC0000; --tablo-bg:#EEEEEE; }
+
+    /* ORTAK */
+    .hr-koyu { border:none; border-top:1pt solid var(--koyu); margin:3mm 0 4mm; }
+    .hr-ince { border:none; border-top:0.5pt solid var(--sinir); margin:1mm 0; }
+    small { font-size:7pt; color:var(--orta); font-style:italic; }
+
+    /* ─── SAYFA 1 ─── */
+    /* HEADER */
+    .s1-header { display:grid; grid-template-columns:34mm 105mm 37mm; gap:0; margin-bottom:0; }
+    .logo-kutu { display:flex; align-items:center; justify-content:center; min-height:24mm; color:#aaa; font-size:7pt; text-align:center; padding:4px; }
+    .qr-kutu   { border:0.5pt solid var(--sinir); display:flex; align-items:center; justify-content:center; min-height:18mm; color:#bbb; font-size:6pt; text-align:center; padding:4px; margin-top:1mm; }
+    .orta-blok { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0 4mm; }
+    .lab-adi   { font-size:11pt; font-weight:700; color:var(--lacivert); text-align:center; line-height:1.3; }
+    .lab-adres { font-size:7pt; color:var(--orta); text-align:center; margin-top:2mm; }
+    .sert-baslik    { font-size:13pt; font-weight:700; color:var(--koyu); text-align:center; margin-top:3mm; }
+    .sert-baslik-en { font-size:10pt; color:var(--orta); font-style:italic; text-align:center; }
+    .turkak-kutu { text-align:center; padding:3mm; }
+    .turkak-adi  { font-size:9pt; font-weight:700; color:var(--kirmizi); }
+    .turkak-alt  { font-size:6.5pt; color:var(--lacivert); line-height:1.4; margin-top:1mm; }
+    .qr-sag      { text-align:center; padding:2mm; margin-top:1mm; }
+    .qr-placeholder { width:24mm; height:24mm; background:#f0f0f0; display:inline-flex; align-items:center; justify-content:center; font-size:7pt; color:#999; border:1px solid #ddd; }
+    .sag-blok    { display:flex; flex-direction:column; }
+
+    /* BİLGİ SATIRLARI */
+    .bilgi-tablo { width:100%; border-collapse:collapse; margin-bottom:1mm; }
+    .bilgi-tablo td { padding:3px 4px; border-bottom:0.5pt solid var(--sinir); vertical-align:middle; font-size:8pt; }
+    .bilgi-baslik { color:var(--lacivert); font-weight:700; width:52mm; }
+    .bilgi-baslik-en { font-size:6.5pt; color:#888; font-weight:400; font-style:italic; }
+
+    /* STANDART METİNLER */
+    .std-metin { font-size:7.5pt; color:var(--koyu); line-height:1.4; margin-bottom:1mm; }
+    .std-metin-en { font-size:6.5pt; color:var(--orta); font-style:italic; line-height:1.35; margin-bottom:2mm; }
+
+    /* İMZA */
+    .imza-tablo { width:100%; border-collapse:collapse; margin-top:2mm; }
+    .imza-tablo td { border:0.5pt solid var(--sinir); background:var(--acik); padding:5px 4px 16px; text-align:center; font-size:8pt; vertical-align:top; }
+    .imza-baslik { font-weight:700; font-size:8pt; }
+    .imza-en     { font-size:6.5pt; color:#888; font-style:italic; }
+    .imza-deger  { font-weight:700; margin-top:4mm; font-size:8pt; }
+
+    /* ALT BAR */
+    .alt-bar { display:grid; grid-template-columns:1fr 1fr; border-top:0.5pt solid var(--sinir); padding-top:3px; margin-top:2mm; }
+    .alt-sol { font-size:6pt; color:var(--orta); }
+    .alt-sag { font-size:6pt; color:var(--orta); text-align:right; }
+
+    /* YASAL */
+    .yasal { font-size:6pt; color:var(--orta); font-style:italic; text-align:center; line-height:1.4; margin-bottom:1mm; }
+    .sayfa-no { font-size:6.5pt; color:var(--orta); margin-top:2mm; display:flex; justify-content:space-between; }
+
+    /* ─── SAYFA 2 ─── */
+    .s2-header { display:grid; grid-template-columns:1fr 1fr; margin-bottom:0; }
+    .s2-lab-adi { font-size:9pt; font-weight:700; color:var(--lacivert); text-align:justify; }
+    .s2-sert-no { font-size:9pt; font-weight:700; color:var(--lacivert); text-align:right; }
+
+    .tarih-satir { display:grid; grid-template-columns:62mm 28mm 56mm auto; font-size:8pt; border-bottom:0.5pt solid var(--sinir); padding:2px 0; }
+    .tarih-baslik { font-weight:700; }
+
+    .bolum-baslik { background:var(--lacivert); color:white; font-size:8.5pt; font-weight:700; padding:3px 5px; margin:3mm 0 1mm; }
+
+    .icerik-tablo { width:100%; border-collapse:collapse; }
+    .icerik-tablo td { font-size:8pt; padding:2px 4px 2px; border-bottom:0.5pt solid var(--sinir); vertical-align:top; }
+    .icerik-tablo .ic-baslik { font-weight:700; width:72mm; padding-left:6px; }
+    .icerik-tablo .ic-en { font-size:7pt; font-style:italic; font-weight:400; }
+
+    .s2-metin    { font-size:8pt; color:var(--koyu); line-height:1.4; margin-bottom:1mm; }
+    .s2-metin-en { font-size:7pt; color:var(--orta); font-style:italic; line-height:1.35; margin-bottom:2mm; }
+
+    .prosedur-tablo { width:100%; border-collapse:collapse; margin-bottom:2mm; }
+    .prosedur-tablo th { background:var(--tablo-bg); font-size:8pt; padding:3px 5px; text-align:center; border:0.3pt solid var(--sinir); font-weight:700; }
+    .prosedur-tablo td { font-size:8pt; padding:3px 5px; border:0.3pt solid var(--sinir); text-align:center; }
+    .prosedur-tablo tr:nth-child(even) td { background:var(--acik); }
+
+    .ref-tablo { width:100%; border-collapse:collapse; margin-bottom:2mm; table-layout:fixed; }
+    .ref-tablo th { background:var(--tablo-bg); font-size:7pt; padding:3px 4px; text-align:center; border:0.3pt solid var(--sinir); font-weight:700; vertical-align:middle; word-wrap:break-word; }
+    .ref-tablo td { font-size:7pt; padding:3px 4px; border:0.3pt solid var(--sinir); vertical-align:middle; text-align:center; word-wrap:break-word; }
+    .ref-tablo td:nth-child(2) { text-align:left; }
+    .ref-tablo tr:nth-child(even) td { background:var(--acik); }
+
+    /* PRINT */
+    @media print {
+        .toolbar { display:none !important; }
+        body { background:white; }
+        .sayfa-ici { padding:0; }
+        .a4 { box-shadow:none; width:100%; padding:12mm 15mm 10mm; }
+    }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+    <div class="toolbar-left">
+        <span>📄 Sertifika Önizleme</span>
+        <span class="sayfa-bilgi" id="tbSertNo">—</span>
+        <span class="sayfa-bilgi" id="tbToplamSayfa"></span>
+    </div>
+    <div class="toolbar-right">
+        <button class="btn-yazdir" id="btnPdfKaydet" onclick="pdfKaydet()">📥 PDF İndir</button>
+        <button class="btn-kapat"  onclick="window.close()">✕ Kapat</button>
+    </div>
+</div>
+
+<div class="sayfa-ici" id="sayfaIci">
+    <div style="color:#64748b;padding:60px;text-align:center;">⏳ Yükleniyor...</div>
+</div>
+<script>
+async function yukle() {
+    const params = new URLSearchParams(window.location.search);
+    const sertId = params.get('id');
+    const isPrint = params.get('print') === '1'; // Puppeteer (Server) mi geldi kontrolü
+
+    if(!sertId) { document.getElementById('sayfaIci').innerHTML = '<div style="padding:60px;color:#ef4444;">Sertifika ID bulunamadı</div>'; return; }
+
+    try {
+        const [sertRes, ayarRes, qrRes] = await Promise.all([
+            fetch('/api/sertifikalar/' + sertId + '/tam'),
+            fetch('/api/ayarlar'),
+            fetch('/api/sertifikalar/' + sertId + '/qr')
+        ]);
+        const s = await sertRes.json();
+        const ayarlar = await ayarRes.json();
+        const qrData = qrRes.ok ? await qrRes.json() : null;
+
+        const ayar = Array.isArray(ayarlar)
+            ? ayarlar.reduce((o,a) => { o[a.anahtar]=a.deger; return o; }, {})
+            : (ayarlar || {});
+
+        const labAdi     = ayar.lab_adi     || 'AYER KALİBRASYON VE DANIŞMANLIK DIŞ TİC.LTD.ŞTİ.';
+        const labAdres   = ayar.adres       || ayar.lab_adres || '';
+        const labTel     = ayar.telefon     || ayar.lab_tel   || '';
+        const labWeb     = ayar.website     || ayar.lab_web   || '';
+        const labMail    = ayar.email       || ayar.lab_mail  || '';
+        const labTamAdres = labAdres;
+        const akredNo    = ayar.akreditasyon_no || 'AB-0088-K';
+        const akredStd   = 'TS EN ISO/IEC 17025:2017';
+        const formNo     = 'AKFG448 Rev02 110625';
+
+        const olcumSayfa = s.olcum_pdf_sayfa || 0;
+        const toplamSayfa = 2 + olcumSayfa;
+        const sertNo = s.sertifika_no || '—';
+
+        document.getElementById('tbSertNo').textContent = sertNo;
+        document.getElementById('tbToplamSayfa').textContent = 'Toplam: ' + toplamSayfa + ' sayfa';
+        document.title = 'Sertifika - ' + sertNo;
+
+        let prosedurRows = '';
+        if(s.talimat_detay && s.talimat_detay.length) {
+            prosedurRows = s.talimat_detay.map((t,i) => `<tr><td>${t.talimat_kodu||''}</td><td>${t.talimat_adi||''}</td></tr>`).join('');
+        } else {
+            prosedurRows = `<tr><td colspan="2" style="color:#94a3b8;font-style:italic;">—</td></tr>`;
+        }
+
+        let refRows = '';
+        if(s.referans_detay && s.referans_detay.length) {
+            refRows = s.referans_detay.map(r => `<tr><td>${r.envanter_no||'—'}</td><td>${[r.cihaz_adi, r.marka, r.model].filter(Boolean).join(' / ')}</td><td>${r.seri_no||'—'}</td><td>${r.gelecek_kal||'—'}</td><td>${r.son_sert_no||'—'}</td><td>${r.izlenebilirlik||akredNo}</td></tr>`).join('');
+        } else {
+            refRows = `<tr><td colspan="6" style="color:#94a3b8;font-style:italic;">—</td></tr>`;
+        }
+
+        const kal_tarihi   = s.kal_tarihi   ? new Date(s.kal_tarihi).toLocaleDateString('tr-TR')   : '—';
+        const yayin_tarihi = s.yayin_tarihi ? new Date(s.yayin_tarihi).toLocaleDateString('tr-TR') : '—';
+        const onay_tarihi  = s.onay_tarihi  ? new Date(s.onay_tarihi).toLocaleDateString('tr-TR')  : '—';
+        const gelecek_kal  = s.gelecek_kal  ? new Date(s.gelecek_kal).toLocaleDateString('tr-TR')  : '—';
+
+        const cevre = [
+            s.sicaklik ? 'Sıcaklık: ' + s.sicaklik : '',
+            s.nem      ? 'Nem: '      + s.nem      : '',
+            s.basinc   ? 'Basınç: '   + s.basinc   : ''
+        ].filter(Boolean).join('  ,  ') || '—';
+
+        document.getElementById('sayfaIci').innerHTML = `
+        <div class="a4">
+            <div class="s1-header">
+                <div style="display:flex;flex-direction:column;gap:1mm;">
+                    <div class="logo-kutu">${ayar.lab_logo ? `<img src="${ayar.lab_logo}" style="max-width:30mm;max-height:22mm;object-fit:contain;">` : 'LAB LOGOSU'}</div>
+                    <div class="qr-kutu">
+                        ${qrData?.qr ? `<img src="${qrData.qr}" style="width:18mm;height:18mm;"><div style="font-size:5pt;color:var(--orta);text-align:center;margin-top:1mm;">Sertifikayı görüntüle</div>` : '<div style="font-size:6pt;color:#bbb;">QR</div>'}
+                    </div>
+                </div>
+                <div class="orta-blok">
+                    <div class="lab-adi">${labAdi}</div><div class="lab-adres">${labTamAdres}</div>
+                    <div class="sert-baslik">KALİBRASYON SERTİFİKASI</div><div class="sert-baslik-en">Calibration Certificate</div>
+                </div>
+                <div class="sag-blok">
+                    <div class="turkak-kutu">${ayar.turkak_logo ? `<img src="${ayar.turkak_logo}" style="max-width:33mm;max-height:10mm;object-fit:contain;display:block;margin:0 auto 2px;">` : ''}</div>
+                    <div class="qr-sag"><div class="qr-placeholder">QR<br>${sertNo}</div><div style="font-size:6pt;color:var(--orta);margin-top:1mm;">TÜRKAK BDS NO</div><div style="font-size:7pt;font-weight:700;color:var(--lacivert);">${sertNo}</div></div>
+                </div>
+            </div>
+            <hr class="hr-koyu">
+            <table class="bilgi-tablo">
+                <tr><td class="bilgi-baslik"><b>Cihazın Sahibi</b><br><span class="bilgi-baslik-en">Customer</span></td><td><b>${s.firma_adi||'—'}</b></td></tr>
+                <tr><td class="bilgi-baslik"><b>Adres</b><br><span class="bilgi-baslik-en">Address</span></td><td>${s.firma_adres||'—'}</td></tr>
+                <tr><td class="bilgi-baslik"><b>İş Emri Numarası</b><br><span class="bilgi-baslik-en">Order No</span></td><td>${s.fis_no||'—'}</td></tr>
+                <tr><td class="bilgi-baslik"><b>Makine / Cihaz</b><br><span class="bilgi-baslik-en">Instrument / Device</span></td><td>${s.cihaz_adi||'—'}</td></tr>
+                <tr><td class="bilgi-baslik"><b>İmalatçı</b><br><span class="bilgi-baslik-en">Manufacturer</span></td><td>${s.imalatci||'—'}</td></tr>
+                <tr><td class="bilgi-baslik"><b>Tip</b><br><span class="bilgi-baslik-en">Type</span></td><td>${s.tip||'—'}</td></tr>
+                <tr><td class="bilgi-baslik"><b>Seri Numarası</b><br><span class="bilgi-baslik-en">Serial Number</span></td><td>${s.seri_no||'—'}</td></tr>
+                <tr><td class="bilgi-baslik"><b>Kalibrasyon Tarihi</b><br><span class="bilgi-baslik-en">Date of Calibration</span></td><td>${kal_tarihi}</td></tr>
+                <tr><td class="bilgi-baslik"><b>Sertifikanın Sayfa Sayısı</b><br><span class="bilgi-baslik-en">Number of pages</span></td><td>${toplamSayfa}</td></tr>
+                <tr><td class="bilgi-baslik"><b>Demirbaş Numarası</b><br><span class="bilgi-baslik-en">Device ID Number</span></td><td>${s.envanter_no||'—'}</td></tr>
+            </table>
+            <div style="height:3mm;"></div>
+            <p class="std-metin">Bu kalibrasyon sertifikası, Uluslararası Birimler Sisteminde (SI) tanımlanmış birimleri realize eden ulusal ölçüm standartlarına izlenebilirliği belgeler.</p>
+            <p class="std-metin-en">This calibration certificate documents the traceability to national standards, which realize the unit of measurement according to the International System of Units (SI).</p>
+            <p class="std-metin">Kalibrasyon laboratuvarı olarak faaliyet gösteren <b>${labAdi}</b>, Türkak'tan <b>${akredNo}</b> akreditasyon dosya numarası ile <b>${akredStd}</b> standardına göre akredite edilmiştir.</p>
+            <p class="std-metin-en">${labAdi} Calibration Laboratory accredited by TÜRKAK under registration number ${akredNo} for ${akredStd} as Calibration Laboratory.</p>
+            <p class="std-metin">Türk Akreditasyon Kurumu (TÜRKAK) kalibrasyon sertifikalarının tanınırlığı konusunda Avrupa Akreditasyon Birliği (EA) ile Çok Taraflı Anlaşma ve Uluslararası Laboratuvar Akreditasyon Birliği (ILAC) ile karşılıklı tanıma anlaşması imzalamıştır.</p>
+            <p class="std-metin-en">Turkish Accreditation Agency (TURKAK) is signatory to the EA Multilateral Agreement (MLA) and to the ILAC Mutual Recognition Arrangement (MRA) for the recognition of calibration certificates.</p>
+            <p class="std-metin">Ölçüm sonuçları, genişletilmiş ölçüm belirsizlikleri ve kalibrasyon metotları bu sertifikanın tamamlayıcı kısmı olan takip eden sayfalarda verilmiştir.</p>
+            <p class="std-metin-en">The measurements, the uncertainties with confidence probability and calibration methods are given on the following pages which are part of this certificate.</p>
+            <table class="imza-tablo">
+                <tr>
+                    <td style="width:33mm;"><div class="imza-baslik">Mühür</div><div class="imza-en">Seal</div><div style="margin-top:4mm;">${ayar.muhur_logo ? `<img src="${ayar.muhur_logo}" style="max-width:28mm;max-height:20mm;object-fit:contain;">` : ''}</div></td>
+                    <td style="width:42mm;"><div class="imza-baslik">Yayımlandığı Tarih</div><div class="imza-en">Date</div><div class="imza-deger">${yayin_tarihi}</div></td>
+                    <td style="width:60mm;"><div class="imza-baslik">Kalibrasyonu Yapan</div><div class="imza-en">Calibrated by</div><div class="imza-deger">${s.kal_yapan_adi||'—'}</div><div style="display:flex;justify-content:center;margin-top:3mm;"><svg xmlns="http://www.w3.org/2000/svg" width="80" height="32" viewBox="0 0 120 48"><defs><linearGradient id="eg1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1a56db"/><stop offset="100%" stop-color="#0e3a8c"/></linearGradient></defs><rect x="1" y="1" width="118" height="46" rx="6" fill="url(#eg1)" stroke="#1a56db" stroke-width="0.5"/><rect x="3" y="3" width="114" height="42" rx="5" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/><path d="M15 32 Q20 20 28 28 Q33 33 38 18" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="38" cy="18" r="1.5" fill="white"/><line x1="12" y1="35" x2="42" y2="35" stroke="rgba(255,255,255,0.6)" stroke-width="0.8"/><text x="75" y="20" text-anchor="middle" font-size="8" font-weight="bold" fill="white" font-family="Arial,sans-serif">E-&#x130;MZALI</text><text x="75" y="31" text-anchor="middle" font-size="6.5" fill="rgba(255,255,255,0.9)" font-family="Arial,sans-serif">Digitally Signed</text><text x="75" y="41" text-anchor="middle" font-size="5.5" fill="rgba(255,255,255,0.7)" font-family="Arial,sans-serif">&#x2713; Elektronik &#x130;mza</text></svg></div></td>
+                    <td><div class="imza-baslik">Onaylayan / Tarih</div><div class="imza-en">Approval / Date</div><div class="imza-deger" style="margin-bottom:2mm;">${s.onaylayan_adi||'—'}</div><div style="font-size:8pt;margin-bottom:3mm;">${onay_tarihi}</div><div style="display:flex;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="80" height="32" viewBox="0 0 120 48"><defs><linearGradient id="eg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1a56db"/><stop offset="100%" stop-color="#0e3a8c"/></linearGradient></defs><rect x="1" y="1" width="118" height="46" rx="6" fill="url(#eg2)" stroke="#1a56db" stroke-width="0.5"/><rect x="3" y="3" width="114" height="42" rx="5" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/><path d="M15 32 Q20 20 28 28 Q33 33 38 18" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="38" cy="18" r="1.5" fill="white"/><line x1="12" y1="35" x2="42" y2="35" stroke="rgba(255,255,255,0.6)" stroke-width="0.8"/><text x="75" y="20" text-anchor="middle" font-size="8" font-weight="bold" fill="white" font-family="Arial,sans-serif">E-&#x130;MZALI</text><text x="75" y="31" text-anchor="middle" font-size="6.5" fill="rgba(255,255,255,0.9)" font-family="Arial,sans-serif">Digitally Signed</text><text x="75" y="41" text-anchor="middle" font-size="5.5" fill="rgba(255,255,255,0.7)" font-family="Arial,sans-serif">&#x2713; Elektronik &#x130;mza</text></svg></div></td>
+                </tr>
+            </table>
+            <div style="margin-top:auto;">
+                <p class="yasal">Bu sertifika dijital imzalıdır. Laboratuvarın yazılı izni olmadan kısmen kopyalanıp çoğaltılamaz. İmzasız ve mühürsüz sertifikalar geçersizdir.</p>
+                <div class="alt-bar">
+                    <div class="alt-sol">${labAdi}  ${labAdres}</div><div class="alt-sag">Tel: ${labTel}  |  ${labWeb}  |  ${labMail}</div>
+                </div>
+                <div class="sayfa-no"><span>${formNo}</span><span>Sayfa No: 1 / ${toplamSayfa}</span></div>
+            </div>
+        </div>
+
+        <div class="a4">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0;">
+                <div style="font-size:9pt;font-weight:700;color:var(--lacivert);flex:1;text-align:center;">${labAdi}</div>
+                <div style="font-size:9pt;font-weight:700;color:var(--lacivert);white-space:nowrap;margin-left:8mm;">${sertNo}</div>
+            </div>
+            <hr class="hr-koyu">
+            <div class="tarih-satir"><div class="tarih-baslik">Cihazın Kalibrasyona Kabul Tarihi:</div><div>${kal_tarihi}</div><div class="tarih-baslik">Gelecek Kalibrasyon Tarihi:</div><div>${gelecek_kal}</div></div>
+            <div class="bolum-baslik">1. KALİBRASYON YAPILAN CİHAZ BİLGİLERİ / CALIBRATED DEVICE INFORMATION</div>
+            <table class="icerik-tablo">
+                <tr><td class="ic-baslik"><b>Makine/Cihaz</b> / <span class="ic-en">Instrument/Device</span></td><td>: ${s.cihaz_adi||'—'}</td></tr>
+                <tr><td class="ic-baslik"><b>İmalatçı</b> / <span class="ic-en">Manufacturer</span></td><td>: ${s.imalatci||'—'}</td></tr>
+                <tr><td class="ic-baslik"><b>Tip</b> / <span class="ic-en">Type</span></td><td>: ${s.tip||'—'}</td></tr>
+                <tr><td class="ic-baslik"><b>Seri Numarası</b> / <span class="ic-en">Serial Number</span></td><td>: ${s.seri_no||'—'}</td></tr>
+                <tr><td class="ic-baslik"><b>Demirbaş No</b> / <span class="ic-en">Device ID Number</span></td><td>: ${s.envanter_no||'—'}</td></tr>
+                <tr><td class="ic-baslik"><b>Kalibrasyonun Yapıldığı Yer</b> / <span class="ic-en">Calibration Location</span></td><td>: ${s.kal_yeri||'—'}</td></tr>
+            </table>
+            <div class="bolum-baslik">2. ORTAM ŞARTLARI / ENVIRONMENT CONDITIONS</div><p class="s2-metin" style="padding-left:5px;">${cevre}</p>
+            <div class="bolum-baslik">3. ÖLÇÜM ŞARTLARI / MEASUREMENT CONDITIONS</div><p class="s2-metin">Cihaz, kalibrasyon öncesi laboratuvarda bekletilerek ortam şartlarına uyum sağladıktan ve kalibrasyon için gerekli şartlar oluşturulduktan sonra ölçümler gerçekleştirilmiştir.</p>
+            <div class="bolum-baslik">4. ÖLÇÜM BELİRSİZLİĞİ / MEASUREMENT UNCERTAINTY</div><p class="s2-metin">Beyan edilen genişletilmiş ölçüm belirsizliği, standart ölçüm belirsizliğinin normal dağılım için yaklaşık %95 güvenilirlik seviyesini sağlayan k=2 kapsam faktörü ile çarpımının sonucudur.</p>
+            <div class="bolum-baslik">5. KALİBRASYON PROSEDÜRLERİ / CALIBRATION PROCEDURES</div>
+            <table class="prosedur-tablo"><thead><tr><th style="width:40mm;">Prosedür No</th><th>Prosedür Adı</th></tr></thead><tbody>${prosedurRows}</tbody></table>
+            <div class="bolum-baslik">6. KALİBRASYONDA KULLANILAN REFERANSLAR / REFERENCES USED IN CALIBRATION</div>
+            <table class="ref-tablo"><colgroup><col style="width:16mm;"><col style="width:60mm;"><col style="width:24mm;"><col style="width:22mm;"><col style="width:32mm;"><col style="width:22mm;"></colgroup><thead><tr><th>Demirbaş No</th><th>Cihaz Tanımı / Marka / Model</th><th>Seri No</th><th>Gelecek Kal.</th><th>Sertifika No</th><th>İzlenebilirlik</th></tr></thead><tbody>${refRows}</tbody></table>
+            <div class="bolum-baslik">7. AÇIKLAMALAR / REMARKS</div><p class="s2-metin">Kalibrasyon sonuçları, kalibrasyon tarihinden itibaren ve sertifikada belirtilmiş olan şartlar altında geçerlidir.</p>
+            <div class="bolum-baslik">8. UYGUNLUK DEĞERLENDİRME VE KARAR KURALI / CONFORMITY ASSESSMENT AND DECISION RULE</div><p class="s2-metin">Ölçüm sonuçları raporda belirtilmiş olup, değerlendirme kullanıcıya bırakılmıştır.</p>
+            <div class="bolum-baslik">9. GÖRÜŞ VE YORUMLAR / OPINION AND COMMENTS</div><p class="s2-metin">${s.yorum||'—'}</p>
+            <div style="margin-top:auto;padding-top:4mm;">
+                <p class="yasal">Bu sertifika dijital imzalıdır. Laboratuvarın yazılı izni olmadan kısmen kopyalanıp çoğaltılamaz. İmzasız ve mühürsüz sertifikalar geçersizdir.</p>
+                <div class="alt-bar"><div class="alt-sol">${labAdi}  ${labAdres}</div><div class="alt-sag">Tel: ${labTel}  |  ${labWeb}  |  ${labMail}</div></div>
+                <div class="sayfa-no"><span>${formNo}</span><span>Sayfa No: 2 / ${toplamSayfa}</span></div>
+            </div>
+        </div>`;
+
+        // DİKKAT: EĞER BİZİ "SERVER.JS" (Puppeteer) ÇAĞIRIYORSA EKRANA 3. SAYFAYI ÇİZME! 
+        // ÇÜNKÜ SERVER.JS ORİJİNAL DOSYAYI ZATEN ARKA PLANDA ZIMBALAYACAK. 
+        if(s.olcum_pdf_url && !isPrint) {
+            const sayfaIci = document.getElementById('sayfaIci');
+            try {
+                // R2'den saf base64'ü çekiyoruz (atob hatası olmaması için)
+                const pdfRes = await fetch('/api/sertifikalar/' + sertId + '/olcum-pdf');
+                if (!pdfRes.ok) throw new Error("Ölçüm PDF alınamadı");
+                
+                const pdfJson = await pdfRes.json();
+                let gercekBase64 = pdfJson.olcum_pdf_url;
+                if(gercekBase64.includes('base64,')) {
+                    gercekBase64 = gercekBase64.split('base64,')[1];
+                }
+
+                const pdfjsLib = window['pdfjs-dist/build/pdf'];
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                
+                const pdfData = Uint8Array.from(atob(gercekBase64), c => c.charCodeAt(0));
+                const pdfDoc  = await pdfjsLib.getDocument({data: pdfData}).promise;
+
+                for(let i = 1; i <= pdfDoc.numPages; i++) {
+                    const sayfa    = await pdfDoc.getPage(i);
+                    const scale    = 3; // Ultra HD kalite
+                    const viewport = sayfa.getViewport({scale});
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width  = viewport.width;
+                    canvas.height = viewport.height;
+                    canvas.style.width = '100%';
+                    canvas.style.height = 'auto';
+
+                    const sayfaDiv = document.createElement('div');
+                    sayfaDiv.className = 'a4';
+                    sayfaDiv.style.cssText = 'padding:0;width:210mm;overflow:hidden;background:white;';
+
+                    const hd = document.createElement('div');
+                    hd.style.cssText = 'padding:4mm 15mm 2mm;border-bottom:1pt solid #222;display:flex;justify-content:space-between;align-items:center;';
+                    hd.innerHTML = '<span style="font-size:8pt;font-weight:700;color:#1E3A5F;position:absolute;left:50%;transform:translateX(-50%);text-align:center;">' + labAdi + '</span><span style="font-size:8pt;font-weight:700;color:#1E3A5F;margin-left:auto;white-space:nowrap;">' + sertNo + '</span>';
+                    hd.style.position = 'relative';
+                    sayfaDiv.appendChild(hd);
+
+                    const canvasWrap = document.createElement('div');
+                    canvasWrap.style.cssText = 'padding:0 15mm;';
+                    canvasWrap.appendChild(canvas);
+                    sayfaDiv.appendChild(canvasWrap);
+
+                    const ft = document.createElement('div');
+                    ft.style.cssText = 'padding:2mm 15mm 3mm;border-top:0.5pt solid #ccc;';
+                    ft.innerHTML = '<p style="font-size:5.5pt;color:#555;font-style:italic;text-align:center;line-height:1.4;margin-bottom:1mm;">Bu sertifika dijital imzalıdır. İzinsiz kopyalanamaz.</p><div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:6.5pt;color:#555;">' + formNo + '</span><span style="font-size:6.5pt;color:#555;">Sayfa No: ' + (2+i) + ' / ' + toplamSayfa + '</span></div>';
+                    sayfaDiv.appendChild(ft);
+
+                    sayfaIci.appendChild(sayfaDiv);
+                    await sayfa.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+                }
+            } catch(pdfErr) {
+                console.error('Ölçüm PDF hata:', pdfErr);
+            }
+        }
+
+        document.body.setAttribute('data-render-done', 'true');
+
+    } catch(e) {
+        document.getElementById('sayfaIci').innerHTML = '<div style="padding:60px;text-align:center;color:#ef4444;">Hata: ' + e.message + '</div>';
+    }
+}
+
+// YENİ E-İMZA VE İNDİRME FONKSİYONU - EKRAN GÖRÜNTÜSÜ ALMAZ, DİREKT BACKEND'E BAĞLANIR
+async function pdfKaydet(mod) {
+    const btn = document.getElementById('btnPdfKaydet');
+    if(btn) { btn.disabled = true; btn.textContent = '⏳ Hazırlanıyor...'; }
+
+    try {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ unit:'mm', format:'a4', orientation:'portrait' });
+        const sayfalar = document.querySelectorAll('.a4');
+
+        for(let i = 0; i < sayfalar.length; i++) {
+            const sayfa = sayfalar[i];
+            const canvas = await html2canvas(sayfa, {
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                width: sayfa.scrollWidth,
+                height: sayfa.scrollHeight,
+            });
+
+            const imgData = canvas.toDataURL('image/jpeg', 0.92);
+            const pdfW = 210;
+            const pdfH = (canvas.height * pdfW) / canvas.width;
+
+            if(i > 0) pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, pdfH);
+        }
+
+        if(mod === 'base64') {
+            return pdf.output('datauristring').split(',')[1];
+        }
+
+        const pdfBlob = pdf.output('blob');
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        window.open(blobUrl, '_blank');
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+
+    } catch(e) {
+        alert('PDF oluşturulamadı: ' + e.message);
+        console.error(e);
+    }
+
+    if(btn) { btn.disabled = false; btn.textContent = '📥 PDF İndir'; }
+}
+
+window.onload = () => {
+    const params = new URLSearchParams(window.location.search);
+    if(params.get('print') === '1') {
+        document.querySelector('.toolbar').style.display = 'none';
+        document.querySelector('.sayfa-ici').style.paddingTop = '0';
+    }
+    yukle();
+};
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</body>
+</html>

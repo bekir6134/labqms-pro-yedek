@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Cihaz Kabul</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary:#1E40AF; --border:#e2e8f0; --bg:#f8fafc; --success:#10B981; --text:#334155; }
+        * { box-sizing:border-box; }
+        body { font-family:'Inter',sans-serif; background:var(--bg); padding:24px; color:var(--text); margin:0; }
+
+        /* ACCORDION */
+        .accordion { background:#fff; border-radius:12px; border:1px solid var(--border); overflow:hidden; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+        .accordion-header { padding:15px 24px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
+        .accordion-header.active { border-bottom:1px solid var(--border); background:#f1f5f9; }
+        .accordion-content { padding:24px; display:none; }
+
+        /* KART */
+        .card { background:#fff; border-radius:12px; border:1px solid var(--border); box-shadow:0 2px 6px rgba(0,0,0,0.04); }
+        .card-header { padding:14px 22px; border-bottom:1px solid var(--border); background:#f8fafc; display:flex; align-items:center; gap:10px; justify-content:space-between; }
+        .card-title { font-weight:700; color:var(--primary); font-size:0.93rem; }
+
+        /* FORM */
+        .form-grid { display:grid; gap:14px; }
+        .g3 { grid-template-columns:1fr 1fr 1fr; }
+        .full { grid-column:1/-1; }
+        label { display:block; font-size:0.78rem; font-weight:700; color:#64748b; margin-bottom:4px; }
+        input, select, textarea { width:100%; padding:9px 12px; border:1px solid var(--border); border-radius:8px; outline:none; font-family:inherit; font-size:0.88rem; transition:0.2s; background:#fff; color:var(--text); }
+        input:focus, select:focus, textarea:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(30,64,175,0.1); }
+        textarea { resize:vertical; min-height:60px; }
+
+        /* FİRMA ARAMA */
+        .arama-wrapper { position:relative; }
+        .arama-sonuclar { display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid var(--border); border-top:none; border-radius:0 0 8px 8px; max-height:220px; overflow-y:auto; z-index:500; box-shadow:0 6px 16px rgba(0,0,0,0.12); }
+        .arama-item { padding:10px 14px; cursor:pointer; border-bottom:1px solid #f1f5f9; font-size:0.87rem; }
+        .arama-item:hover { background:#eff6ff; }
+        .secili-badge { display:none; margin-top:6px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:7px 12px; font-size:0.84rem; color:#1e40af; font-weight:600; justify-content:space-between; align-items:center; }
+        .secili-badge.goster { display:flex; }
+        .temizle-btn { background:none; border:none; cursor:pointer; color:#64748b; font-size:1rem; }
+
+        /* CİHAZ SEÇİM PANELİ */
+        .cihaz-panel { background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:16px; margin-top:16px; }
+        .cihaz-panel-baslik { font-weight:700; color:var(--primary); font-size:0.87rem; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+        .cihaz-arama-input { padding:9px 12px 9px 34px; background:#fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%2364748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>') no-repeat 10px center; border:1px solid var(--border); border-radius:8px; width:280px; outline:none; font-size:0.85rem; }
+        .cihaz-arama-input:focus { border-color:var(--primary); }
+
+        /* CİHAZ GRID LİSTESİ */
+        .cihaz-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; max-height:320px; overflow-y:auto; margin-top:10px; }
+        .cihaz-kart { background:#fff; border:2px solid var(--border); border-radius:10px; padding:12px 14px; cursor:pointer; transition:0.15s; }
+        .cihaz-kart:hover { border-color:#93c5fd; background:#f0f9ff; }
+        .cihaz-kart.secili { border-color:var(--primary); background:#eff6ff; }
+        .cihaz-kart .ck-ad { font-weight:700; font-size:0.87rem; color:#1e293b; margin-bottom:4px; }
+        .cihaz-kart .ck-meta { font-size:0.78rem; color:#64748b; display:flex; gap:12px; flex-wrap:wrap; }
+        .ck-badge { font-size:0.7rem; font-weight:700; padding:1px 6px; border-radius:6px; background:#dbeafe; color:#1e40af; }
+        .cihaz-empty { text-align:center; color:#94a3b8; padding:24px; font-size:0.85rem; }
+
+        /* SEÇİLEN CİHAZLAR TABLOSU */
+        .secilen-tablo { width:100%; border-collapse:collapse; margin-top:14px; }
+        .secilen-tablo thead { background:var(--primary); }
+        .secilen-tablo th { padding:9px 11px; color:rgba(255,255,255,0.9); font-size:0.75rem; font-weight:600; text-align:left; }
+        .secilen-tablo td { padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:middle; font-size:0.84rem; }
+        .secilen-tablo tr:last-child td { border-bottom:none; }
+        .secilen-tablo input, .secilen-tablo select { padding:5px 8px; font-size:0.82rem; border:1px solid var(--border); border-radius:6px; }
+        .btn-del-row { background:#fee2e2; color:#dc2626; border:none; width:26px; height:26px; border-radius:6px; cursor:pointer; font-size:0.8rem; }
+
+        /* BUTONLAR */
+        .btn-hizli { background:#f0fdf4; color:#166534; border:1px dashed #4ade80; padding:8px 14px; border-radius:8px; cursor:pointer; font-weight:700; font-size:0.83rem; transition:0.2s; display:flex; align-items:center; gap:6px; }
+        .btn-hizli:hover { background:#dcfce7; }
+        .btn-save { background:linear-gradient(135deg,#1e3a8a,var(--primary)); color:white; border:none; padding:12px 26px; border-radius:10px; font-weight:700; cursor:pointer; font-size:0.92rem; box-shadow:0 2px 8px rgba(30,64,175,0.25); }
+        .btn-save:hover { opacity:0.92; transform:translateY(-1px); }
+        .btn-save:disabled { opacity:0.6; cursor:not-allowed; transform:none; }
+        .btn-edit { background:#e0e7ff; color:#4338ca; border:none; padding:5px 10px; border-radius:6px; cursor:pointer; font-size:0.77rem; font-weight:600; margin-right:4px; }
+        .btn-del  { background:#fee2e2; color:#dc2626; border:none; padding:5px 10px; border-radius:6px; cursor:pointer; font-size:0.77rem; font-weight:600; }
+
+        /* LİSTE TABLO */
+        table { width:100%; border-collapse:collapse; }
+        th { background:#f8fafc; padding:10px 12px; text-align:left; color:#64748b; font-size:0.78rem; border-bottom:2px solid var(--border); }
+        td { padding:10px 12px; border-bottom:1px solid var(--border); font-size:0.86rem; vertical-align:middle; }
+        .empty-row td { text-align:center; color:#94a3b8; padding:28px; }
+        .ie-no { color:var(--primary); font-weight:700; }
+        .asama-badge { padding:3px 9px; border-radius:10px; font-size:0.71rem; font-weight:700; }
+        .asama-kabul_edildi { background:#f1f5f9; color:#475569; }
+        .asama-hazırlanıyor { background:#fef9c3; color:#854d0e; }
+        .asama-tamamlandı   { background:#dbeafe; color:#1e40af; }
+        .asama-imzalandı    { background:#ede9fe; color:#6d28d9; }
+        .asama-onaylandı    { background:#d1fae5; color:#065f46; }
+        .asama-sertifika_gönderildi { background:#dcfce7; color:#166634; }
+
+        /* HIZLI FİRMA MODAL */
+        #hizliFirmaModal { display:none; position:fixed; z-index:3000; inset:0; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; }
+        #hizliFirmaModal.open { display:flex; }
+
+        /* HIZLI CİHAZ MODAL */
+        #hizliModal { display:none; position:fixed; z-index:3000; inset:0; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; }
+        #hizliModal.open { display:flex; }
+        .hizli-box { background:#fff; border-radius:14px; width:90%; max-width:600px; max-height:88vh; overflow-y:auto; }
+        .hizli-head { padding:16px 22px; border-bottom:1px solid var(--border); background:#f8fafc; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:5; border-radius:14px 14px 0 0; }
+        .hizli-title { font-weight:700; color:var(--primary); font-size:0.95rem; }
+        .hizli-close { background:none; border:none; font-size:1.2rem; cursor:pointer; color:#64748b; }
+        .hizli-body { padding:20px 22px; }
+        .hizli-foot { padding:14px 22px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; position:sticky; bottom:0; background:#fff; border-radius:0 0 14px 14px; }
+        .fg { display:grid; gap:12px; margin-bottom:12px; }
+        .fg2 { grid-template-columns:1fr 1fr; }
+        .fg3 { grid-template-columns:1fr 1fr 1fr; }
+
+        /* TOAST */
+        #toast { visibility:hidden; min-width:260px; background:var(--success); color:#fff; text-align:center; border-radius:8px; padding:14px; position:fixed; z-index:9999; right:24px; top:24px; font-weight:600; box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+        #toast.show { visibility:visible; }
+        #toast.error { background:#ef4444; }
+
+        .search-box input { padding:9px 9px 9px 34px; background:#fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%2364748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>') no-repeat 10px center; border:1px solid var(--border); border-radius:8px; width:240px; outline:none; font-size:0.84rem; }
+    </style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- HIZLI FİRMA EKLE MODAL -->
+<div id="hizliFirmaModal">
+    <div class="hizli-box">
+        <div class="hizli-head">
+            <div class="hizli-title">🏢 Hızlı Firma Kaydı</div>
+            <button class="hizli-close" onclick="hizliFirmaModalKapat()">✕</button>
+        </div>
+        <div class="hizli-body">
+            <div class="fg fg2">
+                <div class="full">
+                    <label>Firma Adı *</label>
+                    <input type="text" id="hf_firma_adi" placeholder="Firma unvanı...">
+                </div>
+                <div>
+                    <label>Şube / Departman</label>
+                    <input type="text" id="hf_sube_adi" placeholder="İstanbul Şubesi vb.">
+                </div>
+                <div>
+                    <label>Vergi No</label>
+                    <input type="text" id="hf_vergi_no">
+                </div>
+                <div>
+                    <label>Telefon</label>
+                    <input type="text" id="hf_telefon">
+                </div>
+                <div>
+                    <label>E-posta</label>
+                    <input type="text" id="hf_email">
+                </div>
+                <div class="full">
+                    <label>Adres</label>
+                    <textarea id="hf_adres" style="min-height:50px;" placeholder="Firma adresi..."></textarea>
+                </div>
+            </div>
+        </div>
+        <div class="hizli-foot">
+            <button onclick="hizliFirmaModalKapat()" style="background:#f1f5f9;color:#475569;border:none;padding:9px 18px;border-radius:8px;font-weight:600;cursor:pointer;">İptal</button>
+            <button onclick="hizliFirmaKaydet()" style="background:var(--primary);color:white;border:none;padding:9px 20px;border-radius:8px;font-weight:700;cursor:pointer;" id="hizliFirmaKaydetBtn">🏢 Kaydet & Seç</button>
+        </div>
+    </div>
+</div>
+
+<!-- HIZLI CİHAZ EKLE MODAL -->
+<div id="hizliModal">
+    <div class="hizli-box">
+        <div class="hizli-head">
+            <div class="hizli-title">⚡ Hızlı Cihaz Kaydı</div>
+            <button class="hizli-close" onclick="hizliModalKapat()">✕</button>
+        </div>
+        <div class="hizli-body">
+            <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;padding:9px 13px;font-size:0.82rem;color:#92400e;margin-bottom:16px;">
+                ⚡ Kayıt sonrası cihaz otomatik olarak kabul fişine eklenecektir.
+            </div>
+            <div class="fg fg2">
+                <div>
+                    <label>Cihaz Adı *</label>
+                    <input type="text" id="h_cihaz_adi" placeholder="Örn: Termometre">
+                </div>
+                <div>
+                    <label>Kategori *</label>
+                    <select id="h_kategori_id"></select>
+                </div>
+                <div>
+                    <label>Marka</label>
+                    <input type="text" id="h_marka" placeholder="Örn: Testo">
+                </div>
+                <div>
+                    <label>Model</label>
+                    <input type="text" id="h_model" placeholder="Örn: 110">
+                </div>
+            </div>
+            <div class="fg fg3">
+                <div>
+                    <label>Seri No</label>
+                    <input type="text" id="h_seri_no">
+                </div>
+                <div>
+                    <label>Envanter No</label>
+                    <input type="text" id="h_envanter_no">
+                </div>
+                <div>
+                    <label>Kalibrasyon Yeri</label>
+                    <select id="h_kal_yeri">
+                        <option value="Laboratuvarda">Laboratuvarda</option>
+                        <option value="Yerinde">Yerinde</option>
+                    </select>
+                </div>
+            </div>
+            <div class="fg fg2">
+                <div>
+                    <label>Ölçüm Aralığı</label>
+                    <input type="text" id="h_olcum_araligi" placeholder="Örn: -20...+70 °C">
+                </div>
+                <div>
+                    <label>Çözünürlük</label>
+                    <input type="text" id="h_cozunurluk" placeholder="Örn: 0.1 °C">
+                </div>
+            </div>
+        </div>
+        <div class="hizli-foot">
+            <button onclick="hizliModalKapat()" style="background:#f1f5f9;color:#475569;border:none;padding:9px 18px;border-radius:8px;font-weight:600;cursor:pointer;">İptal</button>
+            <button onclick="hizliCihazKaydet()" style="background:var(--primary);color:white;border:none;padding:9px 20px;border-radius:8px;font-weight:700;cursor:pointer;" id="hizliKaydetBtn">⚡ Kaydet & Fişe Ekle</button>
+        </div>
+    </div>
+</div>
+
+<!-- ACCORDION: YENİ KABUL FİŞİ -->
+<div class="accordion">
+    <div class="accordion-header" onclick="toggleAcc()">
+        <h3 style="margin:0;color:var(--primary);">📥 Yeni Cihaz Kabul Fişi</h3>
+        <span id="accIcon">▼</span>
+    </div>
+    <div class="accordion-content" id="accContent">
+        <input type="hidden" id="duzenle_id">
+        <input type="hidden" id="secili_musteri_id">
+
+        <!-- ADIM 1: FİRMA & TARİH -->
+        <div class="form-grid g3" style="margin-bottom:20px;">
+            <div>
+                <label>Firma *</label>
+                <div class="arama-wrapper">
+                    <input type="text" id="firmaAramaInput" placeholder="Firma adı yazın..." autocomplete="off">
+                    <div class="arama-sonuclar" id="firmaSonuclar"></div>
+                </div>
+                <div class="secili-badge" id="firmaSeciliBadge">
+                    <span id="firmaSeciliAdi"></span>
+                    <button class="temizle-btn" onclick="firmaSifirla()">✕</button>
+                </div>
+            </div>
+            <div>
+                <label>Kabul Tarihi *</label>
+                <input type="date" id="kabul_tarihi">
+            </div>
+            <div>
+                <label>Tahmini Teslim Tarihi</label>
+                <input type="date" id="teslim_tarihi">
+            </div>
+            <div class="full">
+                <label>Not / Açıklama</label>
+                <textarea id="notlar" placeholder="Özel talepler, aciliyet durumu vb..."></textarea>
+            </div>
+            <div>
+                <label>İlişkili Teklif <span style="color:#94a3b8;font-weight:400;">(opsiyonel)</span></label>
+                <select id="teklif_id">
+                    <option value="">— Teklif seçin —</option>
+                </select>
+            </div>
+            <div>
+                <label>Teslim Eden (Müşteri Tarafı)</label>
+                <input type="text" id="teslim_eden" placeholder="Adı soyadı...">
+            </div>
+            <div>
+                <label>Teslim Alan (Personel)</label>
+                <select id="teslim_alan_id">
+                    <option value="">— Seçin —</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- ADIM 2: CİHAZ SEÇİM PANELİ -->
+        <div class="cihaz-panel" id="cihazPanel">
+            <div class="cihaz-panel-baslik">
+                <span>📦 Cihaz Seç</span>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input type="text" class="cihaz-arama-input" id="cihazAramaInput" placeholder="Cihaz adı, seri no, envanter no..." oninput="cihazlariFiltrele()">
+                    <button class="btn-hizli" onclick="hizliModalAc()">⚡ Hızlı Cihaz Ekle</button>
+                </div>
+            </div>
+            <div id="cihazHint" style="font-size:0.82rem;color:#94a3b8;padding:8px 0 4px;">
+                👆 Önce bir firma seçin, ardından o firmaya ait cihazlar burada görünecek.
+            </div>
+            <div class="cihaz-grid" id="cihazGrid" style="display:none;"></div>
+        </div>
+
+        <!-- ADIM 3: SEÇİLEN CİHAZLAR -->
+        <div id="secilenCihazlarWrap" style="margin-top:16px;display:none;">
+            <div style="font-weight:700;color:var(--primary);font-size:0.87rem;margin-bottom:8px;">
+                ✅ Seçilen Cihazlar <span id="secilenSayi" style="background:#eff6ff;color:var(--primary);padding:1px 8px;border-radius:8px;font-size:0.78rem;margin-left:6px;"></span>
+            </div>
+            <table class="secilen-tablo">
+                <thead>
+                    <tr>
+                        <th>Cihaz Adı</th>
+                        <th>Marka</th>
+                        <th>Model</th>
+                        <th>Seri No</th>
+                        <th>Envanter No</th>
+                        <th>Fiziksel Durum</th>
+                        <th>Aksesuar / Not</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="secilenBody"></tbody>
+            </table>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:20px;">
+            <button class="btn-save" id="kaydetBtn" onclick="kaydet()">💾 Kabul Fişini Kaydet</button>
+        </div>
+    </div>
+</div>
+
+<!-- LİSTE -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">📋 Kabul Fişleri</div>
+        <div class="search-box">
+            <input type="text" id="araInput" onkeyup="ara()" placeholder="IE no, firma ara...">
+        </div>
+    </div>
+    <div style="padding:18px;">
+        <table>
+            <thead>
+                <tr>
+                    <th>IE No</th>
+                    <th>Firma</th>
+                    <th>Teklif No</th>
+                    <th>Kabul Tarihi</th>
+                    <th>Teslim Tarihi</th>
+                    <th>Teslim Alan</th>
+                    <th>Cihaz</th>
+                    <th>Aşama</th>
+                    <th>İşlemler</th>
+                </tr>
+            </thead>
+            <tbody id="liste"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const ASAMA_LABEL = {
+        kabul_edildi:'Kabul Edildi', 'hazırlanıyor':'Hazırlanıyor',
+        'tamamlandı':'Tamamlandı', imzalandı:'İmzalandı',
+        'onaylandı':'Onaylandı', sertifika_gönderildi:'Sertifika Gönderildi'
+    };
+
+    let musteriler = [], tumCihazlar = [], filtreliCihazlar = [];
+    let tumKayitlar = [], tumKategoriler = [];
+    let secilenCihazlar = []; // { musteri_cihaz_id, cihaz_adi, marka, model, seri_no, envanter_no, kategori_adi, durum, aksesuar }
+
+    function showToast(msg, err=false) {
+        const t = document.getElementById("toast");
+        t.textContent = msg; t.className = err ? "show error" : "show";
+        setTimeout(() => t.className = "", 3200);
+    }
+
+    // ── ACCORDION ──
+    function toggleAcc() {
+        const c = document.getElementById("accContent");
+        const h = document.querySelector(".accordion-header");
+        const i = document.getElementById("accIcon");
+        const acik = c.style.display === "block";
+        c.style.display = acik ? "none" : "block";
+        h.classList.toggle("active", !acik);
+        i.innerText = acik ? "▼" : "▲";
+    }
+    function accAc() {
+        document.getElementById("accContent").style.display = "block";
+        document.querySelector(".accordion-header").classList.add("active");
+        document.getElementById("accIcon").innerText = "▲";
+    }
+
+    // ── FİRMA ARAMA ──
+    function firmaAramaKur() {
+        const input = document.getElementById("firmaAramaInput");
+        const sonuclar = document.getElementById("firmaSonuclar");
+        const goster = () => {
+            const val = input.value.trim().toUpperCase();
+            const filtered = val
+                ? musteriler.filter(m => m.firma_adi.toUpperCase().includes(val) || (m.sube_adi||"").toUpperCase().includes(val))
+                : musteriler;
+            let html = filtered.slice(0,30).map(m =>
+                `<div class="arama-item" data-id="${m.id}" data-ad="${(m.firma_adi+(m.sube_adi?' / '+m.sube_adi:'')).replace(/"/g,'&quot;')}">
+                    <strong>${m.firma_adi}</strong>${m.sube_adi?` <span style="color:#94a3b8;font-size:0.8rem;">/ ${m.sube_adi}</span>`:''}
+                </div>`
+            ).join('');
+            // Sonuç yoksa hızlı ekle butonu göster
+            if(!filtered.length && val) {
+                html = `<div class="arama-item" style="color:#94a3b8;font-size:0.82rem;">Firma bulunamadı</div>`;
+            }
+            html += `<div class="arama-item" style="color:#166534;background:#f0fdf4;font-weight:700;border-top:1px solid #d1fae5;" 
+                onmousedown="event.preventDefault();hizliFirmaModalAc('${input.value.trim().replace(/'/g,"\'")}')">
+                ➕ Hızlı Firma Ekle
+            </div>`;
+            sonuclar.innerHTML = html;
+            sonuclar.style.display = "block";
+            sonuclar.querySelectorAll(".arama-item[data-id]").forEach(el => {
+                el.addEventListener("mousedown", e => { e.preventDefault(); firmaSec(el.dataset.id, el.dataset.ad); });
+            });
+        };
+        input.addEventListener("input", goster);
+        input.addEventListener("focus", goster);
+        document.addEventListener("click", e => {
+            if(!input.contains(e.target) && !sonuclar.contains(e.target)) sonuclar.style.display="none";
+        });
+    }
+
+    async function firmaSec(id, ad) {
+        document.getElementById("secili_musteri_id").value = id;
+        document.getElementById("firmaAramaInput").value = "";
+        document.getElementById("firmaSonuclar").style.display = "none";
+        document.getElementById("firmaSeciliAdi").textContent = ad;
+        document.getElementById("firmaSeciliBadge").classList.add("goster");
+        // Firmaya ait cihazları çek
+        try {
+            const res = await fetch("/api/musteri-cihazlari-firma/" + id);
+            tumCihazlar = await res.json();
+        } catch(e) { tumCihazlar = []; }
+        filtreliCihazlar = [...tumCihazlar];
+        document.getElementById("cihazHint").style.display = "none";
+        document.getElementById("cihazGrid").style.display = "grid";
+        document.getElementById("cihazAramaInput").value = "";
+        renderCihazGrid(filtreliCihazlar);
+        teklifleriDoldur(id);
+    }
+
+    function firmaSifirla() {
+        document.getElementById("secili_musteri_id").value = "";
+        document.getElementById("firmaAramaInput").value = "";
+        document.getElementById("firmaSeciliBadge").classList.remove("goster");
+        tumCihazlar = []; filtreliCihazlar = [];
+        document.getElementById("cihazHint").style.display = "block";
+        document.getElementById("cihazGrid").style.display = "none";
+        teklifleriDoldur(null);
+    }
+
+    // ── CİHAZ GRID ──
+    function cihazlariFiltrele() {
+        const ara = document.getElementById("cihazAramaInput").value.trim().toUpperCase();
+        filtreliCihazlar = ara
+            ? tumCihazlar.filter(c =>
+                (c.cihaz_adi||"").toUpperCase().includes(ara) ||
+                (c.seri_no||"").toUpperCase().includes(ara) ||
+                (c.envanter_no||"").toUpperCase().includes(ara) ||
+                (c.marka||"").toUpperCase().includes(ara)
+              )
+            : [...tumCihazlar];
+        renderCihazGrid(filtreliCihazlar);
+    }
+
+    function renderCihazGrid(data) {
+        const grid = document.getElementById("cihazGrid");
+        if(!data.length) {
+            grid.innerHTML = '<div class="cihaz-empty" style="grid-column:1/-1;">Bu firma için kayıtlı cihaz bulunamadı.</div>';
+            return;
+        }
+        grid.innerHTML = data.map(c => {
+            const secili = secilenCihazlar.some(s => s.musteri_cihaz_id == c.id);
+            return `<div class="cihaz-kart ${secili?'secili':''}" onclick="cihazToggle(${c.id})" data-cihaz-id="${c.id}">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+                    <div class="ck-ad">${c.cihaz_adi}</div>
+                    ${secili ? '<span style="color:var(--primary);font-size:1rem;">✓</span>' : ''}
+                </div>
+                <div class="ck-meta">
+                    ${c.marka ? `<span>🏷️ ${c.marka}${c.model?' / '+c.model:''}</span>` : ''}
+                    ${c.seri_no ? `<span>S/N: ${c.seri_no}</span>` : ''}
+                    ${c.envanter_no ? `<span>ENV: ${c.envanter_no}</span>` : ''}
+                </div>
+                ${c.kategori_adi ? `<div style="margin-top:6px;"><span class="ck-badge">${c.kategori_adi}</span></div>` : ''}
+            </div>`;
+        }).join('');
+    }
+
+    function cihazToggle(id) {
+        const c = tumCihazlar.find(x => x.id == id);
+        if(!c) return;
+        const idx = secilenCihazlar.findIndex(s => s.musteri_cihaz_id == id);
+        if(idx >= 0) {
+            secilenCihazlar.splice(idx, 1);
+        } else {
+            secilenCihazlar.push({
+                musteri_cihaz_id: c.id,
+                cihaz_adi:  c.cihaz_adi,
+                marka:      c.marka||'',
+                model:      c.model||'',
+                seri_no:    c.seri_no||'',
+                envanter_no:c.envanter_no||'',
+                kategori_adi: c.kategori_adi||'',
+                durum:      'Sağlam',
+                aksesuar:   ''
+            });
+        }
+        renderCihazGrid(filtreliCihazlar);
+        renderSecilenler();
+    }
+
+    function renderSecilenler() {
+        const wrap = document.getElementById("secilenCihazlarWrap");
+        const tbody = document.getElementById("secilenBody");
+        const sayi = document.getElementById("secilenSayi");
+        if(!secilenCihazlar.length) { wrap.style.display="none"; return; }
+        wrap.style.display = "block";
+        sayi.textContent = secilenCihazlar.length + " cihaz";
+        tbody.innerHTML = secilenCihazlar.map((c,i) => `<tr>
+            <td style="font-weight:600;">${c.cihaz_adi}</td>
+            <td>${c.marka||'—'}</td>
+            <td>${c.model||'—'}</td>
+            <td>${c.seri_no||'—'}</td>
+            <td>${c.envanter_no||'—'}</td>
+            <td>
+                <select onchange="secilenGuncelle(${i},'durum',this.value)" style="min-width:110px;">
+                    <option ${c.durum==='Sağlam'?'selected':''}>Sağlam</option>
+                    <option ${c.durum==='Çizik'?'selected':''}>Çizik</option>
+                    <option ${c.durum==='Hasarlı'?'selected':''}>Hasarlı</option>
+                    <option ${c.durum==='Eksik Parça'?'selected':''}>Eksik Parça</option>
+                </select>
+            </td>
+            <td><input type="text" placeholder="Kablo, kutu..." value="${c.aksesuar}" onchange="secilenGuncelle(${i},'aksesuar',this.value)" style="min-width:130px;"></td>
+            <td><button class="btn-del-row" onclick="cihazKaldir(${i})">✕</button></td>
+        </tr>`).join('');
+    }
+
+    function secilenGuncelle(idx, alan, deger) {
+        secilenCihazlar[idx][alan] = deger;
+    }
+
+    function cihazKaldir(idx) {
+        secilenCihazlar.splice(idx, 1);
+        renderCihazGrid(filtreliCihazlar);
+        renderSecilenler();
+    }
+
+    // ── HIZLI FİRMA EKLE ──
+    function hizliFirmaModalAc(oncekiAd='') {
+        ['hf_firma_adi','hf_sube_adi','hf_vergi_no','hf_telefon','hf_email','hf_adres'].forEach(id=>{
+            const el = document.getElementById(id);
+            if(el) el.value='';
+        });
+        if(oncekiAd) document.getElementById("hf_firma_adi").value = oncekiAd;
+        document.getElementById("firmaSonuclar").style.display="none";
+        document.getElementById("hizliFirmaModal").classList.add("open");
+    }
+    function hizliFirmaModalKapat() {
+        document.getElementById("hizliFirmaModal").classList.remove("open");
+    }
+    async function hizliFirmaKaydet() {
+        const firmaAdi = document.getElementById("hf_firma_adi").value.trim();
+        if(!firmaAdi) return showToast("❌ Firma adı gerekli!", true);
+        const btn = document.getElementById("hizliFirmaKaydetBtn");
+        btn.disabled=true; btn.textContent="Kaydediliyor...";
+        try {
+            const res = await fetch("/api/musteriler", {
+                method:"POST", headers:{"Content-Type":"application/json"},
+                body: JSON.stringify({
+                    firma_adi:  firmaAdi,
+                    sube_adi:   document.getElementById("hf_sube_adi").value.trim()||null,
+                    vergi_no:   document.getElementById("hf_vergi_no").value.trim()||null,
+                    telefon:    document.getElementById("hf_telefon").value.trim()||null,
+                    email:      document.getElementById("hf_email").value.trim()||null,
+                    adres:      document.getElementById("hf_adres").value.trim()||null
+                })
+            });
+            if(!res.ok) throw new Error();
+            const yeni = await res.json();
+            musteriler.push(yeni);
+            const ad = yeni.firma_adi + (yeni.sube_adi?' / '+yeni.sube_adi:'');
+            await firmaSec(yeni.id, ad);
+            hizliFirmaModalKapat();
+            showToast(`✅ "${ad}" kaydedildi ve seçildi!`);
+        } catch(e) { showToast("❌ Kayıt başarısız!", true); }
+        btn.disabled=false; btn.textContent="🏢 Kaydet & Seç";
+    }
+
+    // ── HIZLI CİHAZ EKLE ──
+    function hizliModalAc() {
+        const musteriId = document.getElementById("secili_musteri_id").value;
+        if(!musteriId) { showToast("❌ Önce bir firma seçin!", true); return; }
+        // Kategori selecti doldur
+        const sel = document.getElementById("h_kategori_id");
+        sel.innerHTML = '<option value="">— Seçin —</option>' +
+            tumKategoriler.map(k => `<option value="${k.id}">${k.kategori_adi}</option>`).join('');
+        // Formu temizle
+        ['h_cihaz_adi','h_marka','h_model','h_seri_no','h_envanter_no','h_olcum_araligi','h_cozunurluk'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById("h_kal_yeri").value = 'Laboratuvarda';
+        document.getElementById("hizliModal").classList.add("open");
+    }
+
+    function hizliModalKapat() {
+        document.getElementById("hizliModal").classList.remove("open");
+    }
+
+    async function hizliCihazKaydet() {
+        const musteriId = document.getElementById("secili_musteri_id").value;
+        const cihazAdi  = document.getElementById("h_cihaz_adi").value.trim();
+        const kategoriId = document.getElementById("h_kategori_id").value;
+        if(!cihazAdi) return showToast("❌ Cihaz adı gerekli!", true);
+        if(!kategoriId) return showToast("❌ Kategori seçin!", true);
+
+        const btn = document.getElementById("hizliKaydetBtn");
+        btn.disabled = true; btn.textContent = "Kaydediliyor...";
+
+        const payload = {
+            musteri_id:     musteriId,
+            kategori_id:    kategoriId,
+            cihaz_adi:      cihazAdi,
+            marka:          document.getElementById("h_marka").value.trim(),
+            model:          document.getElementById("h_model").value.trim(),
+            seri_no:        document.getElementById("h_seri_no").value.trim(),
+            envanter_no:    document.getElementById("h_envanter_no").value.trim(),
+            kalibrasyon_yeri: document.getElementById("h_kal_yeri").value,
+            olcum_araligi:  document.getElementById("h_olcum_araligi").value.trim(),
+            cozunurluk:     document.getElementById("h_cozunurluk").value.trim()
+        };
+
+        try {
+            const res = await fetch("/api/musteri-cihazlari", {
+                method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)
+            });
+            if(!res.ok) throw new Error();
+            const yeni = await res.json();
+
+            // Kategori adını bul
+            const kat = tumKategoriler.find(k => k.id == kategoriId);
+            yeni.kategori_adi = kat?.kategori_adi || '';
+
+            // Cihazı listeye ve seçilenlere ekle
+            tumCihazlar.push(yeni);
+            filtreliCihazlar = [...tumCihazlar];
+            secilenCihazlar.push({
+                musteri_cihaz_id: yeni.id,
+                cihaz_adi:   yeni.cihaz_adi,
+                marka:       yeni.marka||'',
+                model:       yeni.model||'',
+                seri_no:     yeni.seri_no||'',
+                envanter_no: yeni.envanter_no||'',
+                kategori_adi: yeni.kategori_adi,
+                durum:       'Sağlam',
+                aksesuar:    ''
+            });
+
+            renderCihazGrid(filtreliCihazlar);
+            renderSecilenler();
+            hizliModalKapat();
+            showToast(`✅ "${yeni.cihaz_adi}" kaydedildi ve fişe eklendi!`);
+        } catch(e) {
+            showToast("❌ Kayıt başarısız!", true);
+        }
+        btn.disabled = false; btn.textContent = "⚡ Kaydet & Fişe Ekle";
+    }
+
+    // ── KAYDET ──
+    async function kaydet() {
+        const musteriId = document.getElementById("secili_musteri_id").value;
+        const kabulTarihi = document.getElementById("kabul_tarihi").value;
+        if(!musteriId)       return showToast("❌ Firma seçin!", true);
+        if(!kabulTarihi)     return showToast("❌ Kabul tarihi girin!", true);
+        if(!secilenCihazlar.length) return showToast("❌ En az bir cihaz seçin!", true);
+
+        const duzenleId = document.getElementById("duzenle_id").value;
+        const cihazlar = secilenCihazlar.map(c => ({
+            musteri_cihaz_id: c.musteri_cihaz_id,
+            cihaz_adi:   c.cihaz_adi,
+            marka_model: [c.marka, c.model].filter(Boolean).join(" / "),
+            seri_no:     c.seri_no,
+            envanter_no: c.envanter_no,
+            kategori_adi: c.kategori_adi,
+            durum:       c.durum,
+            aksesuar:    c.aksesuar
+        }));
+
+        const payload = {
+            musteri_id:    musteriId,
+            kabul_tarihi:  kabulTarihi,
+            teslim_tarihi: document.getElementById("teslim_tarihi").value || null,
+            cihazlar,
+            notlar:        document.getElementById("notlar").value,
+            teklif_id:     document.getElementById("teklif_id").value || null,
+            teslim_eden:   document.getElementById("teslim_eden").value.trim() || null,
+            teslim_alan_id:document.getElementById("teslim_alan_id").value || null,
+            asama: duzenleId ? (tumKayitlar.find(x=>x.id==duzenleId)?.asama || "kabul_edildi") : "kabul_edildi"
+        };
+
+        const btn = document.getElementById("kaydetBtn");
+        btn.disabled = true; btn.textContent = "Kaydediliyor...";
+        const url    = duzenleId ? `/api/is-emirleri/${duzenleId}` : "/api/is-emirleri";
+        const method = duzenleId ? "PUT" : "POST";
+        const res = await fetch(url, { method, headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload) });
+        if(res.ok) { showToast(duzenleId ? "✅ Güncellendi!" : "✅ Kabul fişi oluşturuldu!"); formTemizle(); listele(); }
+        else showToast("❌ Kayıt başarısız!", true);
+        btn.disabled = false; btn.textContent = "💾 Kabul Fişini Kaydet";
+    }
+
+    // ── LİSTE ──
+    async function listele() {
+        const res = await fetch("/api/is-emirleri");
+        tumKayitlar = await res.json();
+        renderListe(tumKayitlar);
+    }
+
+    function renderListe(data) {
+        const tbody = document.getElementById("liste");
+        if(!data.length) { tbody.innerHTML='<tr class="empty-row"><td colspan="7">Henüz kabul fişi yok.</td></tr>'; return; }
+        tbody.innerHTML = data.map(r => {
+            const cihazlar = Array.isArray(r.cihazlar) ? r.cihazlar : JSON.parse(r.cihazlar||"[]");
+            const kabul  = r.kabul_tarihi  ? new Date(r.kabul_tarihi).toLocaleDateString("tr-TR")  : "-";
+            const teslim = r.teslim_tarihi ? new Date(r.teslim_tarihi).toLocaleDateString("tr-TR") : "-";
+            const asama  = r.asama || "kabul_edildi";
+            return `<tr>
+                <td class="ie-no">${r.ie_no||"-"}</td>
+                <td>${r.firma_adi}${r.sube_adi?` <span style="color:#94a3b8;font-size:0.77rem;">/ ${r.sube_adi}</span>`:""}</td>
+                <td>${r.teklif_no?`<span style="font-size:0.78rem;color:#7c3aed;font-weight:700;">${r.teklif_no}</span>`:'<span style="color:#94a3b8;">—</span>'}</td>
+                <td>${kabul}</td><td>${teslim}</td>
+                <td style="font-size:0.82rem;">${r.teslim_alan_adi||'—'}</td>
+                <td><span style="background:#eff6ff;color:var(--primary);padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">${cihazlar.length} cihaz</span></td>
+                <td><span class="asama-badge asama-${asama}">${ASAMA_LABEL[asama]||asama}</span></td>
+                <td>
+                    <button class="btn-edit" onclick="duzenle(${r.id})">✏️ Düzenle</button>
+                    <button class="btn-del"  onclick="sil(${r.id})">🗑️ Sil</button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    // ── DÜZENLE ──
+    async function duzenle(id) {
+        const r = tumKayitlar.find(x=>x.id===id); if(!r) return;
+        document.getElementById("duzenle_id").value = r.id;
+        document.getElementById("secili_musteri_id").value = r.musteri_id;
+        document.getElementById("firmaSeciliAdi").textContent = r.firma_adi + (r.sube_adi?" / "+r.sube_adi:"");
+        document.getElementById("firmaSeciliBadge").classList.add("goster");
+        document.getElementById("kabul_tarihi").value  = r.kabul_tarihi?.substring(0,10)||"";
+        document.getElementById("teslim_tarihi").value = r.teslim_tarihi?.substring(0,10)||"";
+        document.getElementById("notlar").value = r.notlar||"";
+        // Firma cihazlarını çek
+        try {
+            const res = await fetch("/api/musteri-cihazlari-firma/"+r.musteri_id);
+            tumCihazlar = await res.json();
+            filtreliCihazlar = [...tumCihazlar];
+            document.getElementById("cihazHint").style.display = "none";
+            document.getElementById("cihazGrid").style.display = "grid";
+        } catch(e) {}
+        // Seçilen cihazları yükle
+        const cihazlar = Array.isArray(r.cihazlar)?r.cihazlar:JSON.parse(r.cihazlar||"[]");
+        secilenCihazlar = cihazlar.map(c => ({
+            musteri_cihaz_id: c.musteri_cihaz_id||null,
+            cihaz_adi:   c.cihaz_adi,
+            marka:       c.marka||(c.marka_model||'').split('/')[0].trim(),
+            model:       c.model||(c.marka_model||'').split('/')[1]?.trim()||'',
+            seri_no:     c.seri_no||'',
+            envanter_no: c.envanter_no||'',
+            kategori_adi:c.kategori_adi||'',
+            durum:       c.durum||'Sağlam',
+            aksesuar:    c.aksesuar||''
+        }));
+        renderCihazGrid(filtreliCihazlar);
+        renderSecilenler();
+        // Yeni alanları doldur
+        document.getElementById("teslim_eden").value = r.teslim_eden||"";
+        document.getElementById("teslim_alan_id").value = r.teslim_alan_id||"";
+        teklifleriDoldur(r.musteri_id);
+        setTimeout(()=>{ document.getElementById("teklif_id").value = r.teklif_id||""; }, 50);
+        document.getElementById("kaydetBtn").textContent = "💾 Güncelle";
+        accAc();
+        window.scrollTo({top:0, behavior:"smooth"});
+    }
+
+    async function sil(id) {
+        if(!confirm("Bu kabul fişini silmek istediğinize emin misiniz?")) return;
+        const res = await fetch(`/api/is-emirleri/${id}`, {method:"DELETE"});
+        if(res.ok) { showToast("🗑️ Silindi!"); listele(); }
+        else showToast("❌ Silinemedi!", true);
+    }
+
+    function formTemizle() {
+        document.getElementById("duzenle_id").value = "";
+        firmaSifirla();
+        document.getElementById("kabul_tarihi").valueAsDate = new Date();
+        document.getElementById("teslim_tarihi").value = "";
+        document.getElementById("notlar").value = "";
+        document.getElementById("cihazAramaInput").value = "";
+        secilenCihazlar = [];
+        renderSecilenler();
+        document.getElementById("teklif_id").value = "";
+        document.getElementById("teslim_eden").value = "";
+        // Teslim alan - oturum açanı tekrar seç
+        const kullanici = JSON.parse(localStorage.getItem("labqms_user")||'{}');
+        const mevcutP = personeller.find(p=>p.kullanici_adi===kullanici.kullanici_adi);
+        if(mevcutP) document.getElementById("teslim_alan_id").value = mevcutP.id;
+        document.getElementById("kaydetBtn").textContent = "💾 Kabul Fişini Kaydet";
+    }
+
+    function ara() {
+        const f = document.getElementById("araInput").value.toUpperCase();
+        renderListe(f ? tumKayitlar.filter(r =>
+            (r.ie_no||"").toUpperCase().includes(f) || (r.firma_adi||"").toUpperCase().includes(f)
+        ) : tumKayitlar);
+    }
+
+    let personeller = [], teklifler = [];
+
+    async function yukle() {
+        const [ieRes, katRes] = await Promise.all([
+            fetch("/api/is-emirleri-on-veriler"),
+            fetch("/api/kategoriler")
+        ]);
+        const d = await ieRes.json();
+        musteriler    = d.musteriler||[];
+        personeller   = d.personeller||[];
+        teklifler     = d.teklifler||[];
+        tumKategoriler = await katRes.json();
+
+        // Teslim alan dropdown
+        const taSel = document.getElementById("teslim_alan_id");
+        taSel.innerHTML = '<option value="">— Seçin —</option>' +
+            personeller.map(p=>`<option value="${p.id}">${p.ad_soyad}</option>`).join('');
+        // Oturum açan kişiyi otomatik seç
+        const kullanici = JSON.parse(localStorage.getItem("labqms_user")||'{}');
+        const mevcutP = personeller.find(p=>p.kullanici_adi===kullanici.kullanici_adi);
+        if(mevcutP) taSel.value = mevcutP.id;
+
+        document.getElementById("kabul_tarihi").valueAsDate = new Date();
+        firmaAramaKur();
+        listele();
+    }
+
+    function teklifleriDoldur(musteriId) {
+        const sel = document.getElementById("teklif_id");
+        const filtered = musteriId ? teklifler.filter(t=>t.musteri_id==musteriId) : teklifler;
+        sel.innerHTML = '<option value="">— Teklif seçin —</option>' +
+            filtered.map(t=>`<option value="${t.id}">${t.teklif_no}</option>`).join('');
+    }
+
+    window.onload = yukle;
+</script>
+</body>
+</html>

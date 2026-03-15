@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Sistem Ayarları</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #1E40AF; --border: #e2e8f0; --bg: #f8fafc; --success: #10B981; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); padding: 24px; color: #334155; margin: 0; }
+
+        .card { background: #fff; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; overflow: hidden; }
+        .card-header { padding: 16px 24px; border-bottom: 1px solid var(--border); background: #f8fafc; display: flex; align-items: center; gap: 10px; }
+        .card-icon { width: 34px; height: 34px; border-radius: 8px; background: #dbeafe; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+        .card-title { font-weight: 700; color: var(--primary); font-size: 0.95rem; }
+        .card-body { padding: 24px; }
+
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .full { grid-column: 1 / -1; }
+        label { display: block; font-size: 0.8rem; font-weight: 700; color: #64748b; margin-bottom: 6px; }
+        input, textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; outline: none; font-family: inherit; font-size: 0.9rem; transition: 0.2s; }
+        input:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(30,64,175,0.1); }
+        textarea { resize: vertical; min-height: 80px; }
+        .hint { font-size: 0.75rem; color: #94a3b8; margin-top: 4px; }
+
+        /* LOGO UPLOAD */
+        .logo-upload-area { border: 2px dashed var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: 0.2s; position: relative; }
+        .logo-upload-area:hover { border-color: var(--primary); background: #eff6ff; }
+        .logo-upload-area input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+        .logo-preview { max-height: 80px; max-width: 200px; object-fit: contain; border-radius: 6px; }
+        .logo-placeholder { color: #94a3b8; font-size: 0.85rem; }
+        .logo-placeholder .icon { font-size: 2rem; display: block; margin-bottom: 6px; }
+
+        /* KAYDET */
+        .btn-save { background: var(--primary); color: white; border: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.95rem; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
+        .btn-save:hover { background: #1e3a8a; }
+        .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* ÖNIZLEME */
+        .preview-box { background: #0f172a; border-radius: 10px; padding: 16px 20px; display: flex; align-items: center; gap: 12px; }
+        .preview-logo { width: 36px; height: 36px; object-fit: contain; border-radius: 6px; display: none; }
+        .preview-text { color: white; }
+        .preview-title { font-size: 1.1rem; font-weight: 700; }
+        .preview-sub { font-size: 0.78rem; color: #60A5FA; margin-top: 2px; font-weight: 600; }
+
+        /* TÜRKAK BAĞLANTI */
+        .baglanti-durum { display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:8px; font-size:0.83rem; font-weight:600; }
+        .baglanti-basarili { background:#dcfce7; color:#166534; }
+        .baglanti-hatali { background:#fee2e2; color:#dc2626; }
+        .baglanti-test { background:#f1f5f9; color:#64748b; }
+        .btn-test { background:#0891b2; color:white; border:none; padding:10px 20px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.88rem; transition:0.2s; }
+        .btn-test:hover { background:#0e7490; }
+        .btn-test:disabled { opacity:0.6; cursor:not-allowed; }
+        .token-bilgi { background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px 14px; font-size:0.82rem; color:#1e40af; margin-top:10px; }
+        .sifre-wrapper { position:relative; }
+        .sifre-wrapper input { padding-right:40px; }
+        .sifre-goster { position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1rem; color:#94a3b8; }
+
+        #toast { visibility: hidden; min-width: 260px; background-color: var(--success); color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 9999; right: 30px; top: 30px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        #toast.show { visibility: visible; }
+        #toast.error { background-color: #ef4444; }
+    </style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- SİDEBAR ÖNİZLEME -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-icon">👁️</div>
+        <div class="card-title">Sidebar Önizleme</div>
+    </div>
+    <div class="card-body">
+        <p style="color:#64748b; font-size:0.85rem; margin-top:0;">Ayarları kaydettikten sonra sol menü bu şekilde görünecek:</p>
+        <div class="preview-box">
+            <img class="preview-logo" id="previewLogoImg">
+            <div class="preview-text">
+                <div class="preview-title">🔬 LabQMS<span style="color:#60A5FA;">Pro</span></div>
+                <div class="preview-sub" id="previewLabAdi">Lab Adı Buraya Gelir</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- LAB BİLGİLERİ -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-icon">🏢</div>
+        <div class="card-title">Laboratuvar Bilgileri</div>
+    </div>
+    <div class="card-body">
+        <div class="form-grid">
+            <div class="full">
+                <label>Laboratuvar Adı *</label>
+                <input type="text" id="lab_adi" placeholder="Örn: Ayer Kalibrasyon Lab." oninput="onizlemeGuncelle()">
+                <div class="hint">💡 Sol menüde "LabQMS Pro" yazısının altında görünecek</div>
+            </div>
+            <div>
+                <label>Akreditasyon No</label>
+                <input type="text" id="akreditasyon_no" placeholder="Örn: AB-0123-T">
+            </div>
+            <div>
+                <label>Vergi / TC No</label>
+                <input type="text" id="vergi_no" placeholder="Vergi numarası">
+            </div>
+            <div>
+                <label>Telefon</label>
+                <input type="text" id="telefon" placeholder="0312 000 00 00">
+            </div>
+            <div>
+                <label>E-posta</label>
+                <input type="email" id="email" placeholder="info@lab.com">
+            </div>
+            <div>
+                <label>Web Sitesi</label>
+                <input type="text" id="website" placeholder="www.lab.com">
+            </div>
+            <div class="full">
+                <label>Açık Adres</label>
+                <textarea id="adres" placeholder="Sokak, mahalle, ilçe, il..."></textarea>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TÜRKAK API BAĞLANTISI -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-icon">🔗</div>
+        <div class="card-title">TÜRKAK API Bağlantı Ayarları</div>
+    </div>
+    <div class="card-body">
+        <div class="form-grid">
+            <div class="full">
+                <div style="background:#fef9c3; border:1px solid #fbbf24; border-radius:8px; padding:10px 14px; font-size:0.82rem; color:#854d0e; margin-bottom:16px;">
+                    ⚠️ Bu bilgiler TÜRKAK TBDS sistemine erişim için kullanılır. Akredite sertifika numarası alabilmek için gereklidir.
+                    Bilgiler şifreli olarak saklanır.
+                </div>
+            </div>
+            <div>
+                <label>TÜRKAK Kullanıcı Adı (E-posta)</label>
+                <input type="email" id="turkak_username" placeholder="ornek@lab.com">
+                <div class="hint">💡 TÜRKAK ASIST portalındaki giriş e-postanız</div>
+            </div>
+            <div>
+                <label>TÜRKAK Şifre</label>
+                <div class="sifre-wrapper">
+                    <input type="password" id="turkak_password" placeholder="••••••••">
+                    <button class="sifre-goster" onclick="sifreGoster()" type="button" id="sifreBtn">👁️</button>
+                </div>
+                <div class="hint">💡 TÜRKAK ASIST portalı şifreniz</div>
+            </div>
+            <div>
+                <label>Akreditasyon Dosya No (FileID)</label>
+                <input type="text" id="turkak_file_id" placeholder="Örn: AB-0088-K dosyasının GUID'i">
+                <div class="hint">💡 TÜRKAK API'den alınan dosya ID (GUID formatı)</div>
+            </div>
+            <div>
+                <label>Kalibrasyon Dosya Numarası</label>
+                <input type="text" id="turkak_dosya_no" placeholder="Örn: 0088K">
+                <div class="hint">💡 Sertifika numarasının başındaki dosya kodu</div>
+            </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:12px; margin-top:16px; flex-wrap:wrap;">
+            <button class="btn-test" id="testBtn" onclick="turkakTest()">🔌 Bağlantıyı Test Et</button>
+            <div id="baglantiDurum" class="baglanti-durum baglanti-test">⚪ Test edilmedi</div>
+        </div>
+
+        <div id="tokenBilgi" class="token-bilgi" style="display:none;">
+            <strong>🟢 Bağlantı Aktif</strong><br>
+            Token alındı: <span id="tokenZaman"></span><br>
+            Token geçerlilik: 12 saat (otomatik yenilenir)
+        </div>
+    </div>
+</div>
+
+<!-- KAPSAM DIŞI NUMARA AYARLARI -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-icon">🏷️</div>
+        <div class="card-title">Kapsam Dışı Sertifika Numara Ayarları</div>
+    </div>
+    <div class="card-body">
+        <div class="form-grid">
+            <div>
+                <label>Numara Formatı</label>
+                <input type="text" id="kd_format" placeholder="Örn: KD-{YIL}-{SAYI}">
+                <div class="hint">💡 {YIL} = yıl, {SAYI} = artan sayı (001, 002...)</div>
+            </div>
+            <div>
+                <label>Mevcut Sayaç</label>
+                <input type="number" id="kd_sayac" placeholder="0" min="0">
+                <div class="hint">💡 Sonraki numara bu değerden devam eder</div>
+            </div>
+            <div>
+                <label>Numara Basamak Sayısı</label>
+                <input type="number" id="kd_basamak" placeholder="3" min="1" max="6">
+                <div class="hint">💡 3 → 001, 002... | 4 → 0001, 0002...</div>
+            </div>
+            <div>
+                <label>Rezerve Süre Limiti (Gün)</label>
+                <input type="number" id="kd_rezerve_gun" placeholder="15" min="1" max="90">
+                <div class="hint">💡 Bu süre içinde kullanılmayan rezerve numaralar iade edilir</div>
+            </div>
+            <div class="full">
+                <label>Örnek Numara Önizleme</label>
+                <div style="background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:10px 14px; font-size:0.9rem; font-weight:700; color:var(--primary);" id="kdOnizleme">
+                    KD-2026-001
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+        <div class="card" style="margin-bottom:16px;">
+            <div class="card-header">
+                <div class="card-icon">📧</div>
+                <div class="card-title">Mail (SMTP) Ayarları</div>
+            </div>
+            <div class="card-body">
+                <div class="form-grid">
+                    <div>
+                        <label>SMTP Sunucu</label>
+                        <input type="text" id="smtp_host" placeholder="mail.sirket.com">
+                    </div>
+                    <div>
+                        <label>SMTP Port</label>
+                        <input type="number" id="smtp_port" placeholder="587">
+                    </div>
+                    <div>
+                        <label>Mail Adresi</label>
+                        <input type="email" id="smtp_user" placeholder="info@sirket.com">
+                    </div>
+                    <div>
+                        <label>Mail Şifresi</label>
+                        <div class="sifre-wrapper">
+                            <input type="password" id="smtp_pass" placeholder="••••••••">
+                            <button class="sifre-goster" onclick="smtpSifreGoster()" type="button" id="smtpSifreBtn">👁️</button>
+                        </div>
+                        <div class="hint">💡 Şifre kaydedilince gösterilmez</div>
+                    </div>
+                    <div>
+                        <label>Gönderen Adı</label>
+                        <input type="text" id="smtp_from_name" placeholder="Ayer Kalibrasyon">
+                    </div>
+                    <div>
+                        <label>Bağlantı Tipi</label>
+                        <select id="smtp_secure" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.9rem;">
+                            <option value="false">STARTTLS (Port 587)</option>
+                            <option value="true">SSL (Port 465)</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-top:12px;">
+                    <button onclick="smtpTest()" style="background:#e0f2fe;color:#0369a1;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:600;">📨 Test Maili Gönder</button>
+                    <span id="smtpTestSonuc" style="margin-left:10px;font-size:0.85rem;"></span>
+                </div>
+            </div>
+        </div>
+
+<!-- LOGO -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-icon">🖼️</div>
+        <div class="card-title">Logo & Görsel Ayarlar</div>
+    </div>
+    <div class="card-body">
+        <div class="form-grid">
+            <div>
+                <label>Lab Logosu</label>
+                <div class="logo-upload-area" onclick="document.getElementById('labLogoInput').click()">
+                    <input type="file" id="labLogoInput" accept="image/*" onchange="logoOnizle('labLogoInput','labLogoPreview','previewLogoImg')">
+                    <div id="labLogoPreview">
+                        <div class="logo-placeholder"><span class="icon">🏷️</span>Tıklayarak logo yükleyin<br><small>PNG, JPG, SVG</small></div>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label>Türkak / Akreditasyon Logosu</label>
+                <div class="logo-upload-area" onclick="document.getElementById('turkakLogoInput').click()">
+                    <input type="file" id="turkakLogoInput" accept="image/*" onchange="logoOnizle('turkakLogoInput','turkakLogoPreview',null)">
+                    <div id="turkakLogoPreview">
+                        <div class="logo-placeholder"><span class="icon">🏅</span>Akreditasyon logosu yükleyin<br><small>PNG, JPG, SVG</small></div>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label>Mühür / İmza Görseli</label>
+                <div class="logo-upload-area" onclick="document.getElementById('muhurInput').click()">
+                    <input type="file" id="muhurInput" accept="image/*" onchange="logoOnizle('muhurInput','muhurPreview',null)">
+                    <div id="muhurPreview">
+                        <div class="logo-placeholder"><span class="icon">🔏</span>Mühür / imza görseli yükleyin<br><small>PNG, JPG, SVG</small></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KAYDET -->
+<div style="display:flex; justify-content:flex-end;">
+    <button class="btn-save" id="saveBtn" onclick="kaydet()">💾 Ayarları Kaydet</button>
+</div>
+
+<script>
+    let logoBase64 = { lab: '', turkak: '', muhur: '' };
+
+    function showToast(msg, isError=false) {
+        const t = document.getElementById("toast");
+        t.textContent = msg; t.className = isError ? "show error" : "show";
+        setTimeout(()=>{ t.className=""; }, 3000);
+    }
+
+    function onizlemeGuncelle() {
+        const ad = document.getElementById("lab_adi").value || "Lab Adı Buraya Gelir";
+        document.getElementById("previewLabAdi").textContent = ad;
+    }
+
+    function logoOnizle(inputId, previewId, imgId) {
+        const file = document.getElementById(inputId).files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const base64 = e.target.result;
+            // Hangi logo
+            if (inputId === 'labLogoInput') logoBase64.lab = base64;
+            else if (inputId === 'turkakLogoInput') logoBase64.turkak = base64;
+            else if (inputId === 'muhurInput') logoBase64.muhur = base64;
+            // Önizleme güncelle
+            const previewDiv = document.getElementById(previewId);
+            previewDiv.innerHTML = `<img src="${base64}" class="logo-preview">`;
+            // Sidebar önizleme
+            if (imgId) {
+                const img = document.getElementById(imgId);
+                img.src = base64; img.style.display = "block";
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // ── TÜRKAK BAĞLANTI TEST ──
+    async function turkakTest() {
+        const username = document.getElementById("turkak_username").value.trim();
+        const password = document.getElementById("turkak_password").value.trim();
+        if (!username || !password) return showToast("❌ Kullanıcı adı ve şifre giriniz!", true);
+
+        const btn = document.getElementById("testBtn");
+        const durum = document.getElementById("baglantiDurum");
+        btn.disabled = true; btn.textContent = "Test ediliyor...";
+        durum.className = "baglanti-durum baglanti-test";
+        durum.textContent = "⏳ Bağlanıyor...";
+
+        try {
+            const res = await fetch('/api/turkak-token-test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                durum.className = "baglanti-durum baglanti-basarili";
+                durum.textContent = "✅ Bağlantı başarılı!";
+                document.getElementById("tokenBilgi").style.display = "block";
+                document.getElementById("tokenZaman").textContent = new Date().toLocaleString('tr-TR');
+                showToast("✅ TÜRKAK bağlantısı başarılı!");
+            } else {
+                durum.className = "baglanti-durum baglanti-hatali";
+                durum.textContent = "❌ " + (data.error || "Bağlantı başarısız!");
+                document.getElementById("tokenBilgi").style.display = "none";
+                showToast("❌ " + (data.error || "Bağlantı başarısız!"), true);
+            }
+        } catch(e) {
+            durum.className = "baglanti-durum baglanti-hatali";
+            durum.textContent = "❌ Sunucuya ulaşılamadı!";
+            showToast("❌ Sunucuya ulaşılamadı!", true);
+        }
+        btn.disabled = false; btn.textContent = "🔌 Bağlantıyı Test Et";
+    }
+
+    function sifreGoster() {
+        const input = document.getElementById("turkak_password");
+        const btn = document.getElementById("sifreBtn");
+        if (input.type === "password") { input.type = "text"; btn.textContent = "🙈"; }
+        else { input.type = "password"; btn.textContent = "👁️"; }
+    }
+
+    // ── KAPSAM DIŞI NUMARA ÖNİZLEME ──
+    function kdOnizlemeGuncelle() {
+        const format = document.getElementById("kd_format").value || "KD-{YIL}-{SAYI}";
+        const sayac = parseInt(document.getElementById("kd_sayac").value || 0) + 1;
+        const basamak = parseInt(document.getElementById("kd_basamak").value || 3);
+        const yil = new Date().getFullYear();
+        const sayi = String(sayac).padStart(basamak, '0');
+        const onizleme = format.replace('{YIL}', yil).replace('{SAYI}', sayi);
+        document.getElementById("kdOnizleme").textContent = onizleme;
+    }
+
+    async function sayfaYukle() {
+        try {
+            const res = await fetch('/api/ayarlar');
+            const data = await res.json();
+            const set = (id, key) => { if (data[key]) document.getElementById(id).value = data[key]; };
+            set('lab_adi', 'lab_adi');
+            set('akreditasyon_no', 'akreditasyon_no');
+            set('vergi_no', 'vergi_no');
+            set('telefon', 'telefon');
+            set('email', 'email');
+            set('website', 'website');
+            set('adres', 'adres');
+            set('turkak_username', 'turkak_username');
+            set('turkak_file_id', 'turkak_file_id');
+            set('turkak_dosya_no', 'turkak_dosya_no');
+            set('smtp_host', 'smtp_host');
+            set('smtp_port', 'smtp_port');
+            set('smtp_user', 'smtp_user');
+            set('smtp_from_name', 'smtp_from_name');
+            const smtpSecureEl = document.getElementById('smtp_secure');
+            if(smtpSecureEl && data.smtp_secure) smtpSecureEl.value = data.smtp_secure;
+            set('kd_format', 'kd_format');
+            set('kd_sayac', 'kd_sayac');
+            set('kd_basamak', 'kd_basamak');
+            set('kd_rezerve_gun', 'kd_rezerve_gun');
+            // Şifre güvenlik nedeniyle gösterilmez
+            onizlemeGuncelle();
+            kdOnizlemeGuncelle();
+
+            // Token durumu kontrol
+            if (data.turkak_token_zaman) {
+                document.getElementById("tokenBilgi").style.display = "block";
+                document.getElementById("tokenZaman").textContent = data.turkak_token_zaman;
+                document.getElementById("baglantiDurum").className = "baglanti-durum baglanti-basarili";
+                document.getElementById("baglantiDurum").textContent = "✅ Token aktif";
+            }
+
+            // Logolar
+            if (data.lab_logo) {
+                document.getElementById("labLogoPreview").innerHTML = `<img src="${data.lab_logo}" class="logo-preview">`;
+                const img = document.getElementById("previewLogoImg");
+                img.src = data.lab_logo; img.style.display = "block";
+                logoBase64.lab = data.lab_logo;
+            }
+            if (data.turkak_logo) {
+                document.getElementById("turkakLogoPreview").innerHTML = `<img src="${data.turkak_logo}" class="logo-preview">`;
+                logoBase64.turkak = data.turkak_logo;
+            }
+            if (data.muhur_logo) {
+                document.getElementById("muhurPreview").innerHTML = `<img src="${data.muhur_logo}" class="logo-preview">`;
+                logoBase64.muhur = data.muhur_logo;
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    function smtpSifreGoster() {
+        const input = document.getElementById("smtp_pass");
+        const btn = document.getElementById("smtpSifreBtn");
+        if(input.type === "password") { input.type = "text"; btn.textContent = "🙈"; }
+        else { input.type = "password"; btn.textContent = "👁️"; }
+    }
+
+    async function smtpTest() {
+        const sonuc = document.getElementById('smtpTestSonuc');
+        sonuc.textContent = '⏳ Test ediliyor...';
+        try {
+            const res = await fetch('/api/smtp-test', {method:'POST'});
+            if(res.ok) sonuc.textContent = '✅ Mail gönderildi!';
+            else { const e = await res.json(); sonuc.textContent = '❌ ' + (e.error||'Hata'); }
+        } catch(e) { sonuc.textContent = '❌ Sunucuya ulaşılamadı'; }
+    }
+
+    async function kaydet() {
+        const btn = document.getElementById("saveBtn");
+        btn.disabled = true; btn.textContent = "Kaydediliyor...";
+        const payload = {
+            lab_adi: document.getElementById("lab_adi").value,
+            akreditasyon_no: document.getElementById("akreditasyon_no").value,
+            vergi_no: document.getElementById("vergi_no").value,
+            telefon: document.getElementById("telefon").value,
+            email: document.getElementById("email").value,
+            website: document.getElementById("website").value,
+            adres: document.getElementById("adres").value,
+            turkak_username: document.getElementById("turkak_username").value,
+            turkak_password: document.getElementById("turkak_password").value || undefined,
+            turkak_file_id: document.getElementById("turkak_file_id").value,
+            turkak_dosya_no: document.getElementById("turkak_dosya_no").value,
+            smtp_host: document.getElementById("smtp_host").value,
+            smtp_port: document.getElementById("smtp_port").value,
+            smtp_user: document.getElementById("smtp_user").value,
+            smtp_pass: document.getElementById("smtp_pass").value || undefined,
+            smtp_from_name: document.getElementById("smtp_from_name").value,
+            smtp_secure: document.getElementById("smtp_secure").value,
+            kd_format: document.getElementById("kd_format").value,
+            kd_sayac: document.getElementById("kd_sayac").value,
+            kd_basamak: document.getElementById("kd_basamak").value,
+            kd_rezerve_gun: document.getElementById("kd_rezerve_gun").value,
+            lab_logo: logoBase64.lab,
+            turkak_logo: logoBase64.turkak,
+            muhur_logo: logoBase64.muhur
+        };
+        const res = await fetch('/api/ayarlar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+            showToast("✅ Ayarlar kaydedildi!");
+            // Üst frame'e lab adını bildir
+            if (window.parent && window.parent.labAdiGuncelle) {
+                window.parent.labAdiGuncelle(payload.lab_adi);
+            }
+        } else {
+            showToast("❌ Kayıt başarısız!", true);
+        }
+        btn.disabled = false; btn.textContent = "💾 Ayarları Kaydet";
+    }
+
+    // KD önizleme event
+    document.addEventListener("DOMContentLoaded", () => {
+        ["kd_format","kd_sayac","kd_basamak"].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener("input", kdOnizlemeGuncelle);
+        });
+    });
+
+    window.onload = sayfaYukle;
+</script>
+</body>
+</html>

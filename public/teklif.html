@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+
+    <meta charset="UTF-8"> <script>
+    // GÜVENLİK KONTROLÜ: Kullanıcı giriş yapmış mı?
+    const aktifKullanici = localStorage.getItem("labqms_user");
+    if (!aktifKullanici) {
+        // Eğer giriş yapmamışsa, anında login sayfasına şutla!
+        window.location.href = "login.html";
+    }
+    </script>
+
+    
+    <title>Sistem Ayarları</title>
+    <title>LabQMS Pro - Teklif Hazırlama</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #1E40AF; --primary-light: #3b82f6; --border: #e2e8f0; --bg: #f8fafc; --success: #10B981; --text: #334155; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); padding: 24px; color: var(--text); margin: 0; }
+
+        /* ACCORDION */
+        .accordion { background: #fff; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .accordion-header { padding: 15px 25px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid transparent; background: #fff; }
+        .accordion-header.active { border-bottom-color: var(--border); background: #f1f5f9; }
+        .accordion-content { padding: 25px; display: none; }
+
+        /* FORM */
+        .form-grid { display: grid; gap: 15px; }
+        .g2 { grid-template-columns: 1fr 1fr; }
+        .g3 { grid-template-columns: 2fr 1fr 1fr; }
+        .full { grid-column: 1/-1; }
+        label { display: block; font-size: 0.8rem; font-weight: 700; color: #64748b; margin-bottom: 6px; }
+        input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; outline: none; font-family: inherit; font-size: 0.9rem; color: var(--text); background: #fff; transition: 0.2s; }
+        input:focus, select:focus { border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
+
+        /* ÖZEL ALANLAR */
+        .price-field { background: #f0fdf4; border-radius: 10px; padding: 12px; border: 1px solid #dcfce7; }
+        .price-field label { color: #166534; }
+        .qty-field { background: #fffbeb; border-radius: 10px; padding: 12px; border: 1px solid #fde68a; }
+        .qty-field label { color: #92400e; }
+
+        /* BUTONLAR */
+        .btn-add { background: var(--primary); color: white; border: none; padding: 11px 22px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.9rem; transition: 0.2s; }
+        .btn-add:hover { background: #1e3a8a; }
+        .btn-save-main { background: linear-gradient(135deg, #1e3a8a, var(--primary)); color: white; border: none; padding: 13px 28px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 0.95rem; transition: 0.2s; box-shadow: 0 2px 8px rgba(30,64,175,0.25); }
+        .btn-save-main:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(30,64,175,0.35); }
+        .btn-save-main:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        /* KALEMLİ TABLO (form içi) */
+        .inner-table { width: 100%; border-collapse: collapse; margin-top: 15px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+        .inner-table thead { background: var(--primary); }
+        .inner-table th { padding: 10px 12px; text-align: left; color: rgba(255,255,255,0.9); font-size: 0.78rem; font-weight: 600; }
+        .inner-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+        .inner-table tbody tr:last-child td { border-bottom: none; }
+        .inner-table tbody tr:hover { background: #f8fafc; }
+        .no-data-inner td { text-align: center; color: #94a3b8; padding: 20px; font-size: 0.85rem; }
+        .row-num { width: 24px; height: 24px; background: #eff6ff; color: var(--primary); border-radius: 50%; font-size: 0.72rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+        .price-green { font-weight: 700; color: #059669; }
+        .btn-del-row { background: #fee2e2; color: #dc2626; border: none; width: 26px; height: 26px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+        .btn-del-row:hover { background: #dc2626; color: #fff; }
+
+        /* İNDİRİM & ÖZET */
+        .discount-row { display: flex; align-items: center; gap: 12px; padding: 12px 15px; background: #fffbeb; border-radius: 8px; border: 1px solid #fde68a; margin-top: 15px; }
+        .discount-row label { margin: 0; white-space: nowrap; font-size: 0.85rem; }
+        .discount-row input { max-width: 90px; }
+        .summary-strip { background: linear-gradient(135deg, #1e3a8a, var(--primary)); border-radius: 10px; padding: 16px 22px; display: flex; justify-content: space-between; align-items: center; color: white; margin-top: 15px; }
+        .summary-strip .lbl { font-size: 0.75rem; opacity: 0.75; }
+        .summary-strip .val { font-size: 1.2rem; font-weight: 800; }
+
+        /* LİSTE TABLOSU */
+        .card { background: #fff; padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+        .search-box input { padding: 10px 10px 10px 35px; background: #fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%2364748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>') no-repeat 10px center; border: 1px solid var(--border); border-radius: 8px; width: 280px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8fafc; padding: 11px 12px; text-align: left; color: #64748b; font-size: 0.8rem; border-bottom: 2px solid var(--border); }
+        td { padding: 11px 12px; border-bottom: 1px solid var(--border); font-size: 0.88rem; vertical-align: middle; }
+        .durum-badge { padding: 3px 9px; border-radius: 12px; font-size: 0.72rem; font-weight: 700; }
+        .durum-Taslak { background: #f1f5f9; color: #64748b; }
+        .durum-Onaylandı { background: #dcfce7; color: #166534; }
+        .durum-Reddedildi { background: #fee2e2; color: #dc2626; }
+        .btn-view { background: #dcfce7; color: #059669; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.78rem; font-weight: 600; margin-right: 4px; }
+        .btn-edit { background: #e0e7ff; color: #4338ca; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.78rem; font-weight: 600; margin-right: 4px; }
+        .btn-del { background: #fee2e2; color: #dc2626; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.78rem; font-weight: 600; }
+        .empty-row td { text-align: center; color: #94a3b8; padding: 30px; }
+
+        /* MODAL */
+        #modal { display: none; position: fixed; z-index: 2000; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
+        #modal.open { display: flex; }
+        .modal-box { background: #fff; border-radius: 14px; width: 90%; max-width: 650px; max-height: 85vh; overflow-y: auto; padding: 30px; position: relative; }
+        .modal-close { position: absolute; right: 20px; top: 20px; font-size: 22px; cursor: pointer; color: #64748b; border: none; background: none; }
+        .modal-section { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px dashed var(--border); }
+        .modal-label { font-size: 0.72rem; font-weight: 700; color: var(--primary); text-transform: uppercase; margin-bottom: 4px; }
+        .modal-value { font-size: 0.95rem; color: #1e293b; }
+        .modal-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.85rem; }
+        .modal-table th { background: var(--primary); color: white; padding: 8px 10px; text-align: left; font-size: 0.75rem; }
+        .modal-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+
+        /* COMBO */
+        .combo-wrapper { position: relative; }
+        .combo-dropdown { display: none; position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid var(--border); border-top: none; border-radius: 0 0 8px 8px; max-height: 200px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .combo-item { padding: 9px 13px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
+        .combo-item:hover { background: #f1f5f9; }
+        .combo-item-name { font-weight: 600; font-size: 0.87rem; }
+        .combo-item-sub { font-size: 0.75rem; color: #94a3b8; }
+
+        /* TOAST */
+        #toast { visibility: hidden; min-width: 260px; background-color: var(--success); color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 9999; right: 30px; top: 30px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        #toast.show { visibility: visible; }
+        #toast.error { background-color: #ef4444; }
+    </style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- GÖRÜNTÜLEME MODALI -->
+<div id="modal">
+    <div class="modal-box">
+        <button class="modal-close" onclick="modalKapat()">✕</button>
+        <div id="modalIcerik"></div>
+    </div>
+</div>
+
+<!-- ACCORDION: YENİ TEKLİF / DÜZENLEME -->
+<div class="accordion">
+    <div class="accordion-header" onclick="toggleAccordion()">
+        <h3 style="margin:0; color:var(--primary);">📄 Yeni Teklif Oluştur / Düzenleme</h3>
+        <span id="accIcon">▼</span>
+    </div>
+    <div class="accordion-content" id="accContent">
+        <input type="hidden" id="duzenle_id">
+
+        <!-- MÜŞTERİ BİLGİLERİ -->
+        <div class="form-grid g2" style="margin-bottom:15px;">
+            <div>
+                <label>Firma</label>
+                <select id="firma_adi" onchange="firmaSecildi()">
+                    <option value="">-- Firma Seçin --</option>
+                </select>
+            </div>
+            <div>
+                <label>Teklif Tarihi</label>
+                <input type="date" id="teklif_tarihi">
+            </div>
+            <div>
+                <label>Geçerlilik Süresi</label>
+                <select id="gecerlilik">
+                    <option value="15">15 Gün</option>
+                    <option value="30" selected>30 Gün</option>
+                    <option value="45">45 Gün</option>
+                    <option value="60">60 Gün</option>
+                </select>
+            </div>
+            <div>
+                <label>Teklif Notu</label>
+                <input type="text" id="teklif_notu" placeholder="Opsiyonel not...">
+            </div>
+        </div>
+
+        <!-- KALEM EKLE -->
+        <div style="background:#f8fafc; border-radius:10px; padding:15px; border:1px solid var(--border); margin-bottom:5px;">
+            <div style="font-weight:700; color:var(--primary); font-size:0.88rem; margin-bottom:12px;">🔧 Kalibrasyon Kalemi Ekle</div>
+            <div class="form-grid g3">
+                <div>
+                    <label>Cihaz Tanımı</label>
+                    <div class="combo-wrapper">
+                        <input type="text" id="cihaz_adi" placeholder="Seçin veya yazın..." autocomplete="off"
+                            oninput="cihazComboFiltrele()" onfocus="cihazComboFiltrele()"
+                            onblur="setTimeout(()=>document.getElementById('cihazComboList').style.display='none',200)">
+                        <div class="combo-dropdown" id="cihazComboList"></div>
+                    </div>
+                    <div id="cihazHint" style="font-size:0.73rem; color:#94a3b8; margin-top:4px;">💡 Önce firma seçin</div>
+                </div>
+                <div class="price-field">
+                    <label>Birim Fiyat</label>
+                    <div style="display:flex; gap:6px;">
+                        <input type="number" id="birim_fiyat" placeholder="0.00" style="flex:1;">
+                        <select id="para_birimi" style="width:75px;">
+                            <option value="₺">₺ TL</option>
+                            <option value="$">$ USD</option>
+                            <option value="€">€ EUR</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="qty-field">
+                    <label>Adet</label>
+                    <input type="number" id="adet" value="1" min="1">
+                </div>
+            </div>
+            <div style="margin-top:12px; text-align:right;">
+                <button class="btn-add" onclick="teklifeEkle()">➕ Kaleme Ekle</button>
+            </div>
+        </div>
+
+        <!-- KALEMLER TABLOSU -->
+        <table class="inner-table">
+            <thead>
+                <tr>
+                    <th style="width:40px;">#</th>
+                    <th>Cihaz / Hizmet</th>
+                    <th style="width:70px; text-align:center;">Adet</th>
+                    <th style="width:120px;">Birim Fiyat</th>
+                    <th style="width:130px;">Toplam</th>
+                    <th style="width:40px;"></th>
+                </tr>
+            </thead>
+            <tbody id="teklifBody">
+                <tr class="no-data-inner"><td colspan="6">Henüz kalem eklenmedi.</td></tr>
+            </tbody>
+        </table>
+
+        <!-- İNDİRİM -->
+        <div class="discount-row">
+            <label>🏷️ İndirim (%)</label>
+            <input type="number" id="indirim" value="0" min="0" max="100" oninput="toplamHesapla()">
+            <span id="indirimTutar" style="color:#92400e; font-size:0.85rem; font-weight:600;"></span>
+        </div>
+
+        <!-- ÖZET + KAYDET -->
+        <div class="summary-strip">
+            <div>
+                <div class="lbl">Kalem</div>
+                <div style="font-weight:700;" id="kalemSayisi">0</div>
+            </div>
+            <div style="text-align:center;">
+                <div class="lbl">Ara Toplam</div>
+                <div style="font-weight:700;" id="araToplam">0,00 ₺</div>
+            </div>
+            <div style="text-align:center;">
+                <div class="lbl">Genel Toplam</div>
+                <div class="val" id="genelToplam">0,00 ₺</div>
+            </div>
+            <button class="btn-save-main" id="kaydetBtn" onclick="teklifKaydet()">💾 Teklifi Kaydet</button>
+        </div>
+    </div>
+</div>
+
+<!-- TEKLİF LİSTESİ -->
+<div class="card">
+    <div class="table-header">
+        <h2 style="margin:0; color:var(--primary);">📋 Teklif Listesi</h2>
+        <div class="search-box">
+            <input type="text" id="araInput" onkeyup="tabloAra()" placeholder="Firma, teklif no ara...">
+        </div>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Teklif No</th>
+                <th>Firma</th>
+                <th>Tarih</th>
+                <th>Geçerlilik</th>
+                <th>Toplam</th>
+                <th>Durum</th>
+                <th>İşlemler</th>
+            </tr>
+        </thead>
+        <tbody id="teklifListe"></tbody>
+    </table>
+</div>
+
+<script>
+    let cihazVerileri = [];
+    let firmaCihazlari = [];
+    let musteriler = [];
+    let satirlar = [];
+    let tumTeklifler = [];
+
+    // ── ACCORDION ──
+    function toggleAccordion() {
+        const c = document.getElementById("accContent");
+        const h = document.querySelector(".accordion-header");
+        const i = document.getElementById("accIcon");
+        if (c.style.display === "block") { c.style.display="none"; h.classList.remove("active"); i.innerText="▼"; }
+        else { c.style.display="block"; h.classList.add("active"); i.innerText="▲"; }
+    }
+    function accordionAc() {
+        document.getElementById("accContent").style.display="block";
+        document.querySelector(".accordion-header").classList.add("active");
+        document.getElementById("accIcon").innerText="▲";
+    }
+
+    // ── TOAST ──
+    function showToast(msg, isError=false) {
+        const t = document.getElementById("toast");
+        t.textContent = msg; t.className = isError ? "show error" : "show";
+        setTimeout(()=>{ t.className=""; }, 3000);
+    }
+
+    // ── VERİ YÜKLEMESİ ──
+    async function sayfaYukle() {
+        const res = await fetch('/api/teklif-on-veriler');
+        const data = await res.json();
+        musteriler = data.musteriler;
+        cihazVerileri = data.cihazlar;
+        const fSel = document.getElementById("firma_adi");
+        fSel.innerHTML = '<option value="">-- Firma Seçin --</option>' +
+            musteriler.map(m => `<option value="${m.id}">${m.firma_adi}</option>`).join('');
+        document.getElementById("teklif_tarihi").valueAsDate = new Date();
+        listele();
+    }
+
+    // ── FİRMA SEÇİLDİ ──
+    async function firmaSecildi() {
+        const musteriId = document.getElementById("firma_adi").value;
+        firmaCihazlari = [];
+        document.getElementById("cihaz_adi").value = "";
+        document.getElementById("birim_fiyat").value = "";
+        const hint = document.getElementById("cihazHint");
+        if (!musteriId) { hint.textContent = "💡 Önce firma seçin"; hint.style.color="#94a3b8"; return; }
+        const res = await fetch(`/api/musteri-cihazlari-firma/${musteriId}`);
+        firmaCihazlari = await res.json();
+        if (firmaCihazlari.length > 0) { hint.textContent=`✅ ${firmaCihazlari.length} cihaz bulundu`; hint.style.color="#059669"; }
+        else { hint.textContent="ℹ️ Kayıtlı cihaz yok — el ile yazın"; hint.style.color="#94a3b8"; }
+    }
+
+    // ── COMBO ──
+    function cihazComboFiltrele() {
+        const val = document.getElementById("cihaz_adi").value.toUpperCase();
+        const list = document.getElementById("cihazComboList");
+        const kaynak = firmaCihazlari.length > 0 ? firmaCihazlari : cihazVerileri;
+        const filtered = val ? kaynak.filter(c=>c.cihaz_adi.toUpperCase().includes(val)) : kaynak;
+        if (!filtered.length) { list.style.display="none"; return; }
+        list.innerHTML = filtered.map(c => {
+            const sub = firmaCihazlari.length > 0
+                ? [c.marka, c.model, c.seri_no?'S/N:'+c.seri_no:''].filter(Boolean).join(' · ')
+                : (c.fiyat ? c.fiyat+' '+c.para_birimi : '');
+            return `<div class="combo-item" onmousedown="cihazSec('${c.cihaz_adi.replace(/'/g,"\\'")}',${c.fiyat||0},'${(c.para_birimi||'₺').replace(/[₺$€]/g,m=>m)}')">
+                <div class="combo-item-name">${c.cihaz_adi}</div>
+                <div class="combo-item-sub">${sub}</div>
+            </div>`;
+        }).join('');
+        list.style.display = "block";
+    }
+
+    function cihazSec(ad, fiyat, pb) {
+        document.getElementById("cihaz_adi").value = ad;
+        document.getElementById("cihazComboList").style.display = "none";
+        if (fiyat) {
+            document.getElementById("birim_fiyat").value = fiyat;
+            document.getElementById("para_birimi").value = pb.includes('₺')?'₺':pb.includes('$')?'$':'€';
+        }
+    }
+
+    // ── KALEM EKLE ──
+    function teklifeEkle() {
+        const ad = document.getElementById("cihaz_adi").value.trim();
+        const fiyat = parseFloat(document.getElementById("birim_fiyat").value);
+        const pb = document.getElementById("para_birimi").value;
+        const adet = parseInt(document.getElementById("adet").value) || 1;
+        if (!ad || !fiyat) { showToast("❌ Cihaz ve fiyat giriniz!", true); return; }
+        satirlar.push({ad, fiyat, pb, adet});
+        renderKalemler();
+        document.getElementById("cihaz_adi").value = "";
+        document.getElementById("birim_fiyat").value = "";
+        document.getElementById("adet").value = "1";
+    }
+
+    function kalemSil(i) { satirlar.splice(i,1); renderKalemler(); }
+
+    function renderKalemler() {
+        const tbody = document.getElementById("teklifBody");
+        if (!satirlar.length) {
+            tbody.innerHTML='<tr class="no-data-inner"><td colspan="6">Henüz kalem eklenmedi.</td></tr>';
+            toplamHesapla(); return;
+        }
+        tbody.innerHTML = satirlar.map((s,i) => `
+            <tr>
+                <td><span class="row-num">${i+1}</span></td>
+                <td><strong>${s.ad}</strong></td>
+                <td style="text-align:center;">${s.adet}</td>
+                <td class="price-green">${s.fiyat.toLocaleString('tr-TR',{minimumFractionDigits:2})} ${s.pb}</td>
+                <td class="price-green">${(s.fiyat*s.adet).toLocaleString('tr-TR',{minimumFractionDigits:2})} ${s.pb}</td>
+                <td><button class="btn-del-row" onclick="kalemSil(${i})">✕</button></td>
+            </tr>`).join('');
+        toplamHesapla();
+    }
+
+    function toplamHesapla() {
+        const ind = parseFloat(document.getElementById("indirim").value)||0;
+        const ara = satirlar.reduce((s,k)=>s+k.fiyat*k.adet, 0);
+        const indTutar = ara*ind/100;
+        const genel = ara-indTutar;
+        const pb = satirlar.length>0?satirlar[0].pb:'₺';
+        document.getElementById("kalemSayisi").textContent = satirlar.length+" kalem";
+        document.getElementById("araToplam").textContent = ara.toLocaleString('tr-TR',{minimumFractionDigits:2})+' '+pb;
+        document.getElementById("genelToplam").textContent = genel.toLocaleString('tr-TR',{minimumFractionDigits:2})+' '+pb;
+        document.getElementById("indirimTutar").textContent = ind>0?`− ${indTutar.toLocaleString('tr-TR',{minimumFractionDigits:2})} ${pb} indirim`:'';
+    }
+
+    // ── KAYDET ──
+    async function teklifKaydet() {
+        const musteriId = document.getElementById("firma_adi").value;
+        const duzenleId = document.getElementById("duzenle_id").value;
+        if (!musteriId) return showToast("❌ Firma seçin!", true);
+        if (!satirlar.length) return showToast("❌ En az bir kalem ekleyin!", true);
+        const ind = parseFloat(document.getElementById("indirim").value)||0;
+        const ara = satirlar.reduce((s,k)=>s+k.fiyat*k.adet,0);
+        const genel = ara - ara*ind/100;
+        const payload = {
+            musteri_id: musteriId,
+            teklif_tarihi: document.getElementById("teklif_tarihi").value,
+            gecerlilik_gun: document.getElementById("gecerlilik").value,
+            teklif_notu: document.getElementById("teklif_notu").value,
+            indirim_oran: ind, ara_toplam: ara, genel_toplam: genel,
+            para_birimi: satirlar[0]?.pb||'₺',
+            kalemler: satirlar
+        };
+        const btn = document.getElementById("kaydetBtn");
+        btn.disabled=true; btn.textContent="Kaydediliyor...";
+        const url = duzenleId ? `/api/teklifler/${duzenleId}` : '/api/teklifler';
+        const method = duzenleId ? 'PUT' : 'POST';
+        const res = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+        if (res.ok) {
+            showToast(duzenleId?"✅ Teklif güncellendi!":"✅ Teklif kaydedildi!");
+            formTemizle(); listele();
+        } else showToast("❌ Kayıt başarısız!", true);
+        btn.disabled=false; btn.textContent="💾 Teklifi Kaydet";
+    }
+
+    // ── LİSTELE ──
+    async function listele() {
+        const res = await fetch('/api/teklifler');
+        tumTeklifler = await res.json();
+        renderListe(tumTeklifler);
+    }
+
+    function renderListe(data) {
+        const tbody = document.getElementById("teklifListe");
+        if (!data.length) { tbody.innerHTML='<tr class="empty-row"><td colspan="7">Henüz teklif kaydı bulunmuyor.</td></tr>'; return; }
+        tbody.innerHTML = data.map(t => {
+            const firma = t.firma_adi + (t.sube_adi ? ` <span style="color:#64748b;font-size:0.78rem;">/ ${t.sube_adi}</span>` : '');
+            const tarih = t.teklif_tarihi ? new Date(t.teklif_tarihi).toLocaleDateString('tr-TR') : '-';
+            const durum = t.durum || 'Taslak';
+            return `<tr>
+                <td><strong style="color:var(--primary);">${t.teklif_no||'-'}</strong></td>
+                <td>${firma}</td>
+                <td>${tarih}</td>
+                <td>${t.gecerlilik_gun||30} Gün</td>
+                <td class="price-green">${parseFloat(t.genel_toplam||0).toLocaleString('tr-TR',{minimumFractionDigits:2})} ${t.para_birimi||'₺'}</td>
+                <td><span class="durum-badge durum-${durum}">${durum}</span></td>
+                <td>
+                    <button class="btn-view" onclick="goruntule(${t.id})">👁️ Görüntüle</button>
+                    <button class="btn-edit" onclick="duzenle(${t.id})">✏️ Düzenle</button>
+                    <button class="btn-del" onclick="sil(${t.id})">🗑️ Sil</button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    // ── GÖRÜNTÜLE ──
+    function goruntule(id) {
+        const t = tumTeklifler.find(x=>x.id===id);
+        if (!t) return;
+        const kalemler = Array.isArray(t.kalemler) ? t.kalemler : JSON.parse(t.kalemler||'[]');
+        const tarih = t.teklif_tarihi ? new Date(t.teklif_tarihi).toLocaleDateString('tr-TR') : '-';
+        document.getElementById("modalIcerik").innerHTML = `
+            <h2 style="margin:0 0 20px; color:var(--primary);">📄 ${t.teklif_no}</h2>
+            <div class="modal-section">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                    <div><div class="modal-label">Firma</div><div class="modal-value">${t.firma_adi}${t.sube_adi?' / '+t.sube_adi:''}</div></div>
+                    <div><div class="modal-label">Teklif Tarihi</div><div class="modal-value">${tarih}</div></div>
+                    <div><div class="modal-label">Geçerlilik</div><div class="modal-value">${t.gecerlilik_gun||30} Gün</div></div>
+                    <div><div class="modal-label">Durum</div><div class="modal-value"><span class="durum-badge durum-${t.durum||'Taslak'}">${t.durum||'Taslak'}</span></div></div>
+                    ${t.teklif_notu?`<div class="full"><div class="modal-label">Not</div><div class="modal-value">${t.teklif_notu}</div></div>`:''}
+                </div>
+            </div>
+            <div class="modal-section">
+                <div class="modal-label" style="margin-bottom:8px;">Kalemler</div>
+                <table class="modal-table">
+                    <thead><tr><th>#</th><th>Cihaz</th><th>Adet</th><th>Birim</th><th>Toplam</th></tr></thead>
+                    <tbody>${kalemler.map((k,i)=>`<tr>
+                        <td>${i+1}</td><td>${k.ad}</td><td>${k.adet}</td>
+                        <td>${parseFloat(k.fiyat).toLocaleString('tr-TR',{minimumFractionDigits:2})} ${k.pb}</td>
+                        <td><strong>${(k.fiyat*k.adet).toLocaleString('tr-TR',{minimumFractionDigits:2})} ${k.pb}</strong></td>
+                    </tr>`).join('')}</tbody>
+                </table>
+            </div>
+            <div style="background:var(--primary); color:white; border-radius:10px; padding:15px 20px; display:flex; justify-content:space-between; align-items:center;">
+                <div><div style="font-size:0.75rem; opacity:0.75;">Ara Toplam</div><div style="font-weight:700;">${parseFloat(t.ara_toplam||0).toLocaleString('tr-TR',{minimumFractionDigits:2})} ${t.para_birimi}</div></div>
+                ${t.indirim_oran>0?`<div><div style="font-size:0.75rem; opacity:0.75;">İndirim (%${t.indirim_oran})</div><div style="font-weight:700;">− ${(t.ara_toplam*t.indirim_oran/100).toLocaleString('tr-TR',{minimumFractionDigits:2})} ${t.para_birimi}</div></div>`:''}
+                <div style="text-align:right;"><div style="font-size:0.75rem; opacity:0.75;">Genel Toplam</div><div style="font-size:1.3rem; font-weight:800;">${parseFloat(t.genel_toplam||0).toLocaleString('tr-TR',{minimumFractionDigits:2})} ${t.para_birimi}</div></div>
+            </div>`;
+        document.getElementById("modal").classList.add("open");
+    }
+
+    function modalKapat() { document.getElementById("modal").classList.remove("open"); }
+
+    // ── DÜZENLE ──
+    function duzenle(id) {
+        const t = tumTeklifler.find(x=>x.id===id);
+        if (!t) return;
+        document.getElementById("duzenle_id").value = t.id;
+        document.getElementById("firma_adi").value = t.musteri_id;
+        document.getElementById("teklif_tarihi").value = t.teklif_tarihi?.substring(0,10)||'';
+        document.getElementById("gecerlilik").value = t.gecerlilik_gun||30;
+        document.getElementById("teklif_notu").value = t.teklif_notu||'';
+        document.getElementById("indirim").value = t.indirim_oran||0;
+        satirlar = Array.isArray(t.kalemler) ? t.kalemler : JSON.parse(t.kalemler||'[]');
+        renderKalemler();
+        document.getElementById("kaydetBtn").textContent = "💾 Güncelle";
+        accordionAc();
+        window.scrollTo({top:0, behavior:'smooth'});
+        firmaSecildi();
+    }
+
+    // ── SİL ──
+    async function sil(id) {
+        if (!confirm("Bu teklifi silmek istediğinize emin misiniz?")) return;
+        const res = await fetch(`/api/teklifler/${id}`, {method:'DELETE'});
+        if (res.ok) { showToast("🗑️ Teklif silindi!"); listele(); }
+        else showToast("❌ Silinemedi!", true);
+    }
+
+    // ── FORM TEMİZLE ──
+    function formTemizle() {
+        document.getElementById("duzenle_id").value = "";
+        document.getElementById("firma_adi").value = "";
+        document.getElementById("teklif_tarihi").valueAsDate = new Date();
+        document.getElementById("gecerlilik").value = "30";
+        document.getElementById("teklif_notu").value = "";
+        document.getElementById("indirim").value = "0";
+        document.getElementById("cihaz_adi").value = "";
+        document.getElementById("birim_fiyat").value = "";
+        document.getElementById("adet").value = "1";
+        satirlar = []; renderKalemler();
+        document.getElementById("kaydetBtn").textContent = "💾 Teklifi Kaydet";
+        firmaCihazlari = [];
+        document.getElementById("cihazHint").textContent = "💡 Önce firma seçin";
+        document.getElementById("cihazHint").style.color = "#94a3b8";
+    }
+
+    // ── ARAMA ──
+    function tabloAra() {
+        const f = document.getElementById("araInput").value.toUpperCase();
+        const data = f ? tumTeklifler.filter(t=>
+            (t.teklif_no||'').toUpperCase().includes(f) ||
+            (t.firma_adi||'').toUpperCase().includes(f)
+        ) : tumTeklifler;
+        renderListe(data);
+    }
+
+    window.onload = sayfaYukle;
+</script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+
+    <meta charset="UTF-8"> <script>
+    // GÜVENLİK KONTROLÜ: Kullanıcı giriş yapmış mı?
+    const aktifKullanici = localStorage.getItem("labqms_user");
+    if (!aktifKullanici) {
+        // Eğer giriş yapmamışsa, anında login sayfasına şutla!
+        window.location.href = "login.html";
+    }
+    </script>
+
+    
+    <title>Sistem Ayarları</title>
+    <title>LabQMS Pro - Kategori Yönetimi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #1E40AF; --border: #e2e8f0; --bg: #f8fafc; --success: #10B981; --danger: #ef4444; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg); padding: 20px; color: #334155; }
+        .container { max-width: 800px; margin: auto; }
+        .accordion { background: #fff; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .accordion-header { background: #fff; padding: 15px 25px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid transparent; }
+        .accordion-header.active { border-bottom-color: var(--border); background: #f1f5f9; }
+        .accordion-content { padding: 25px; display: none; }
+        .form-row { display: flex; gap: 10px; }
+        input { flex: 1; padding: 12px 15px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; outline: none; transition: 0.2s; font-family: inherit; }
+        input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1); }
+        .btn-add { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 0 25px; cursor: pointer; font-weight: 600; transition: 0.2s; white-space: nowrap; font-family: inherit; }
+        .btn-add:hover { opacity: 0.9; }
+        .card { background: #fff; padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .list-group { list-style: none; padding: 0; margin: 0; }
+        .list-item { background: #fff; padding: 15px 20px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
+        .list-item:hover { border-color: var(--primary); background: #f1f5f9; }
+        .kategori-ad { font-weight: 600; color: #1e293b; }
+        .btn-edit { color: #4338ca; background: #e0e7ff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; margin-right: 5px; transition: 0.2s; }
+        .btn-delete { color: var(--danger); background: #fee2e2; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: 0.2s; }
+        #toast { visibility: hidden; min-width: 250px; background-color: var(--success); color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 3000; right: 30px; top: 30px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        #toast.show { visibility: visible; }
+        #toast.error { background-color: var(--danger); }
+    </style>
+</head>
+<body>
+<div id="toast">✅ İşlem Başarılı!</div>
+
+<div class="container">
+    <div class="accordion">
+        <div class="accordion-header" onclick="toggleAccordion()">
+            <h3 style="margin:0; color:var(--primary);">➕ Yeni Kategori Ekle / Düzenleme</h3>
+            <span id="accIcon">▼</span>
+        </div>
+        <div class="accordion-content" id="accContent">
+            <input type="hidden" id="duzenle_id" value="">
+            <p style="color:#64748b; font-size:0.9rem; margin-top:0;">Cihaz kütüphanesinde kullanacağınız ana grupları buradan yönetebilirsiniz.</p>
+            <div class="form-row">
+                <input type="text" id="kategoriInput" placeholder="Örn: Basınç Ölçerler, Elektriksel Cihazlar...">
+                <button class="btn-add" id="saveBtn" onclick="kategoriKaydet()">➕ Kategori Ekle</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0; color:var(--primary);">📁 Cihaz Kategorileri</h2>
+        <div id="loading" style="text-align:center; display:none; color:var(--primary);">Yükleniyor...</div>
+        <ul id="kategoriListesi" class="list-group"></ul>
+    </div>
+</div>
+
+<script>
+    function toggleAccordion() {
+        const content = document.getElementById("accContent");
+        const header = document.querySelector(".accordion-header");
+        const icon = document.getElementById("accIcon");
+        if (content.style.display === "block") {
+            content.style.display = "none"; header.classList.remove("active"); icon.innerText = "▼";
+        } else {
+            content.style.display = "block"; header.classList.add("active"); icon.innerText = "▲";
+        }
+    }
+
+    function showToast(msg, isError = false) {
+        const t = document.getElementById("toast");
+        t.textContent = msg;
+        t.className = isError ? "show error" : "show";
+        setTimeout(() => { t.className = ""; }, 3000);
+    }
+
+    async function listeYukle() {
+        document.getElementById("loading").style.display = "block";
+        try {
+            const res = await fetch('/api/kategoriler');
+            const data = await res.json();
+            const liste = document.getElementById("kategoriListesi");
+            liste.innerHTML = data.length === 0
+                ? '<li style="text-align:center; color:#94a3b8; padding:20px;">Henüz kategori eklenmemiş.</li>'
+                : data.map(k => `
+                    <li class="list-item">
+                        <span class="kategori-ad">📁 ${k.kategori_adi}</span>
+                        <div>
+                            <button class="btn-edit" onclick="duzenle(${k.id}, '${k.kategori_adi.replace(/'/g,"\\'")}')">✏️ Düzenle</button>
+                            <button class="btn-delete" onclick="sil(${k.id})">🗑️ Sil</button>
+                        </div>
+                    </li>`).join('');
+        } catch (err) { console.error(err); }
+        finally { document.getElementById("loading").style.display = "none"; }
+    }
+
+    async function kategoriKaydet() {
+        const input = document.getElementById("kategoriInput");
+        const duzenleId = document.getElementById("duzenle_id").value;
+        const ad = input.value.trim();
+        if (!ad) return;
+        const url = duzenleId ? `/api/kategoriler/${duzenleId}` : '/api/kategoriler';
+        const method = duzenleId ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ kategori_adi: ad }) });
+        if (res.ok) {
+            input.value = "";
+            document.getElementById("duzenle_id").value = "";
+            document.getElementById("saveBtn").innerText = "➕ Kategori Ekle";
+            showToast(duzenleId ? "✅ Kategori güncellendi!" : "✅ Kategori eklendi!");
+            listeYukle();
+        } else { const err = await res.json(); alert(err.error || "Bir hata oluştu"); }
+    }
+
+    function duzenle(id, ad) {
+        document.getElementById("duzenle_id").value = id;
+        document.getElementById("kategoriInput").value = ad;
+        document.getElementById("saveBtn").innerText = "💾 Güncelle";
+        const content = document.getElementById("accContent");
+        const header = document.querySelector(".accordion-header");
+        content.style.display = "block"; header.classList.add("active");
+        document.getElementById("accIcon").innerText = "▲";
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function sil(id) {
+        if (!confirm("Bu kategoriyi silmek istediğinize emin misiniz?")) return;
+        const res = await fetch(`/api/kategoriler/${id}`, { method: 'DELETE' });
+        if (res.ok) { showToast("🗑️ Kategori silindi!"); listeYukle(); }
+        else showToast("❌ Silme başarısız!", true);
+    }
+
+    window.onload = listeYukle;
+</script>
+</body>
+</html>

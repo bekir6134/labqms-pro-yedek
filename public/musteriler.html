@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+
+    <meta charset="UTF-8"> <script>
+    // GÜVENLİK KONTROLÜ: Kullanıcı giriş yapmış mı?
+    const aktifKullanici = localStorage.getItem("labqms_user");
+    if (!aktifKullanici) {
+        // Eğer giriş yapmamışsa, anında login sayfasına şutla!
+        window.location.href = "login.html";
+    }
+    </script>
+
+    
+    <title>Sistem Ayarları</title>
+    <title>LabQMS Pro - CRM</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #1E40AF; --border: #e2e8f0; --bg: #f8fafc; --success: #10B981; --danger: #ef4444; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg); padding: 20px; color: #334155; margin: 0; }
+        .container { max-width: 1100px; margin: auto; }
+        .accordion { background: #fff; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .accordion-header { background: #fff; padding: 15px 25px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid transparent; }
+        .accordion-header.active { border-bottom-color: var(--border); background: #f1f5f9; }
+        .accordion-content { padding: 25px; display: none; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .full { grid-column: 1 / -1; }
+        .dynamic-row { display: flex; gap: 5px; margin-bottom: 8px; }
+        label { display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 5px; color: #64748b; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-family: inherit; font-size: 0.9rem; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(30,64,175,0.1); }
+        .btn-plus { background: #e0e7ff; color: #4338ca; border: none; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 0.8rem; margin-left: 5px; }
+        .btn-minus { background: #fee2e2; color: #dc2626; border: none; border-radius: 6px; padding: 0 10px; cursor: pointer; font-size: 1rem; flex-shrink: 0; }
+        .btn-save { background: var(--primary); color: white; padding: 15px; border: none; border-radius: 8px; font-weight: 600; width: 100%; cursor: pointer; margin-top: 20px; font-size: 0.95rem; }
+        .btn-save:hover { background: #1e3a8a; }
+        .sube-hint { font-size: 0.78rem; color: #64748b; margin-top: 4px; }
+        .search-container { margin-bottom: 15px; }
+        .search-bar { width: 100%; padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border); font-size: 0.95rem; box-sizing: border-box; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+        th { background: #f8fafc; padding: 13px 15px; text-align: left; font-size: 0.83rem; color: #64748b; border-bottom: 2px solid var(--border); }
+        td { padding: 12px 15px; border-bottom: 1px solid var(--border); font-size: 0.9rem; vertical-align: middle; }
+        .sube-tag { display: inline-block; background: #eff6ff; color: #3b82f6; font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-top: 3px; }
+        .action-btns { display: flex; gap: 6px; }
+        .btn-action { padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: none; transition: 0.2s; }
+        .btn-view { background: #dcfce7; color: #059669; }
+        .btn-view:hover { background: #059669; color: white; }
+        .btn-edit { background: #e0e7ff; color: var(--primary); }
+        .btn-edit:hover { background: var(--primary); color: white; }
+        .btn-del { background: #fee2e2; color: #dc2626; }
+        .btn-del:hover { background: #dc2626; color: white; }
+        #viewModal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
+        .modal-content { background: #fff; padding: 30px; border-radius: 12px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; position: relative; }
+        .close-modal { position: absolute; right: 20px; top: 20px; font-size: 24px; cursor: pointer; color: #64748b; }
+        .view-item { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed var(--border); }
+        .view-label { font-size: 0.75rem; font-weight: 700; color: var(--primary); text-transform: uppercase; }
+        .view-value { font-size: 1rem; color: #1e293b; margin-top: 3px; }
+        #toast { visibility: hidden; min-width: 250px; background-color: var(--success); color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 3000; right: 30px; top: 30px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        #toast.show { visibility: visible; }
+        #toast.error { background-color: var(--danger); }
+    </style>
+</head>
+<body>
+<div id="toast"></div>
+
+<div id="viewModal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="closeModal()">&times;</span>
+        <h2 style="margin-top:0; color:var(--primary);" id="modalFirmaAdi"></h2>
+        <div id="modalBody"></div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="accordion">
+        <div class="accordion-header" onclick="toggleAccordion()">
+            <h3 style="margin:0; color:var(--primary);">➕ Yeni Müşteri Kaydı / Düzenleme</h3>
+            <span id="accIcon">▼</span>
+        </div>
+        <div class="accordion-content" id="accContent">
+            <form id="musteriForm" onsubmit="kaydet(event)">
+                <input type="hidden" id="musteriId">
+                <div class="form-grid">
+
+                    <div>
+                        <label>Firma Resmi Ünvanı *</label>
+                        <input type="text" id="firma_adi" required placeholder="Örn: Migros Ticaret A.Ş.">
+                    </div>
+
+                    <div>
+                        <label>Şube / Lokasyon Adı <span style="font-weight:400; color:#94a3b8;">(isteğe bağlı)</span></label>
+                        <input type="text" id="sube_adi" placeholder="Örn: Ankara Merkez, Fabrika No:2">
+                        <div class="sube-hint">💡 Aynı firmadan birden fazla kayıt varsa şube adı girilmesi önerilir</div>
+                    </div>
+
+                    <div>
+                        <label>Yetkililer <button type="button" class="btn-plus" onclick="addField('yetkiliList')">+ Ekle</button></label>
+                        <div id="yetkiliList"></div>
+                    </div>
+                    <div>
+                        <label>Telefonlar <button type="button" class="btn-plus" onclick="addField('telList')">+ Ekle</button></label>
+                        <div id="telList"></div>
+                    </div>
+                    <div>
+                        <label>Sertifika Mailleri <button type="button" class="btn-plus" onclick="addField('sMailList')">+ Ekle</button></label>
+                        <div id="sMailList"></div>
+                    </div>
+                    <div>
+                        <label>Fatura Mailleri <button type="button" class="btn-plus" onclick="addField('fMailList')">+ Ekle</button></label>
+                        <div id="fMailList"></div>
+                    </div>
+
+                    <div>
+                        <label>İl</label>
+                        <input list="il-listesi" id="il" onchange="ilceGuncelle()" placeholder="İl seçin">
+                        <datalist id="il-listesi"></datalist>
+                    </div>
+                    <div>
+                        <label>İlçe</label>
+                        <input list="ilce-listesi" id="ilce" placeholder="İlçe seçin">
+                        <datalist id="ilce-listesi"></datalist>
+                    </div>
+                    <div>
+                        <label>Vergi Dairesi</label>
+                        <input type="text" id="vergi_dairesi">
+                    </div>
+                    <div>
+                        <label>Vergi Numarası</label>
+                        <input type="text" id="vergi_no">
+                    </div>
+                    <div class="full">
+                        <label>Açık Adres</label>
+                        <textarea id="adres" rows="2"></textarea>
+                    </div>
+                </div>
+                <button type="submit" class="btn-save" id="saveBtn">💾 Kaydet</button>
+            </form>
+        </div>
+    </div>
+
+    <div style="background:#fff; border-radius:12px; border:1px solid var(--border); padding:20px; box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+        <div class="search-container">
+            <input type="text" id="aramaKutusu" class="search-bar" placeholder="🔍 Firma adı, şube, il veya vergi no ile ara..." onkeyup="tabloArama()">
+        </div>
+        <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Firma Ünvanı</th>
+                        <th>Şube / Lokasyon</th>
+                        <th>Konum</th>
+                        <th>İşlem</th>
+                    </tr>
+                </thead>
+                <tbody id="liste"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let adresVerisi = {};
+    let tumMusteriler = [];
+
+    function toggleAccordion() {
+        const content = document.getElementById("accContent");
+        const header = document.querySelector(".accordion-header");
+        const icon = document.getElementById("accIcon");
+        if (content.style.display === "block") {
+            content.style.display = "none"; header.classList.remove("active"); icon.innerText = "▼";
+        } else {
+            content.style.display = "block"; header.classList.add("active"); icon.innerText = "▲";
+        }
+    }
+
+    function showToast(msg, isError = false) {
+        const t = document.getElementById("toast");
+        t.textContent = msg;
+        t.className = isError ? "show error" : "show";
+        setTimeout(() => { t.className = ""; }, 3000);
+    }
+
+    function tabloArama() {
+        const input = document.getElementById("aramaKutusu").value.toLowerCase();
+        document.querySelectorAll("#liste tr").forEach(row => {
+            row.style.display = row.innerText.toLowerCase().includes(input) ? "" : "none";
+        });
+    }
+
+    function goruntule(id) {
+        const m = tumMusteriler.find(item => item.id == id);
+        if (!m) return;
+        document.getElementById("modalFirmaAdi").innerText = m.firma_adi + (m.sube_adi ? ` — ${m.sube_adi}` : '');
+        document.getElementById("modalBody").innerHTML = `
+            ${m.sube_adi ? `<div class="view-item"><div class="view-label">Şube / Lokasyon</div><div class="view-value">${m.sube_adi}</div></div>` : ''}
+            <div class="view-item"><div class="view-label">Yetkililer</div><div class="view-value">${(m.yetkililer||[]).join(", ") || '-'}</div></div>
+            <div class="view-item"><div class="view-label">Telefonlar</div><div class="view-value">${(m.telefonlar||[]).join(", ") || '-'}</div></div>
+            <div class="view-item"><div class="view-label">Sertifika Mailleri</div><div class="view-value">${(m.sertifika_mailleri||[]).join(", ") || '-'}</div></div>
+            <div class="view-item"><div class="view-label">Fatura Mailleri</div><div class="view-value">${(m.fatura_mailleri||[]).join(", ") || '-'}</div></div>
+            <div class="view-item"><div class="view-label">Konum</div><div class="view-value">${m.il || '-'} / ${m.ilce || '-'}</div></div>
+            <div class="view-item"><div class="view-label">Vergi Bilgileri</div><div class="view-value">${m.vergi_dairesi || '-'} / ${m.vergi_no || '-'}</div></div>
+            <div class="view-item"><div class="view-label">Açık Adres</div><div class="view-value">${m.adres || '-'}</div></div>
+        `;
+        document.getElementById("viewModal").style.display = "flex";
+    }
+    function closeModal() { document.getElementById("viewModal").style.display = "none"; }
+
+    async function adresYukle() {
+        const res = await fetch('/turkiye-il-ilce.json');
+        adresVerisi = await res.json();
+        const ilList = document.getElementById("il-listesi");
+        Object.keys(adresVerisi).forEach(il => {
+            let opt = document.createElement("option"); opt.value = il; ilList.appendChild(opt);
+        });
+    }
+
+    function ilceGuncelle() {
+        const il = document.getElementById("il").value;
+        const ilceList = document.getElementById("ilce-listesi");
+        ilceList.innerHTML = "";
+        if (adresVerisi[il]) {
+            adresVerisi[il].forEach(ilce => {
+                let opt = document.createElement("option"); opt.value = ilce; ilceList.appendChild(opt);
+            });
+        }
+    }
+
+    function addField(id, val = '') {
+        const div = document.createElement("div");
+        div.className = "dynamic-row";
+        div.innerHTML = `<input type="${id.includes('Mail') ? 'email' : 'text'}" class="${id}-input" value="${val}"><button type="button" class="btn-minus" onclick="this.parentElement.remove()">−</button>`;
+        document.getElementById(id).appendChild(div);
+    }
+
+    async function listeYukle() {
+        const res = await fetch('/api/musteriler');
+        tumMusteriler = await res.json();
+        document.getElementById("liste").innerHTML = tumMusteriler.map(m => `
+            <tr>
+                <td><strong>${m.firma_adi}</strong></td>
+                <td>${m.sube_adi ? `<span class="sube-tag">📍 ${m.sube_adi}</span>` : '<span style="color:#94a3b8;font-size:0.82rem;">—</span>'}</td>
+                <td>${[m.il, m.ilce].filter(Boolean).join(' / ') || '—'}</td>
+                <td>
+                    <div class="action-btns">
+                        <button class="btn-action btn-view" onclick="goruntule(${m.id})">👁️ Detay</button>
+                        <button class="btn-action btn-edit" onclick='duzenle(${JSON.stringify(m).replace(/'/g,"&#39;")})'>✏️ Düzenle</button>
+                        <button class="btn-action btn-del" onclick="sil(${m.id})">🗑️ Sil</button>
+                    </div>
+                </td>
+            </tr>`).join('');
+    }
+
+    function duzenle(m) {
+        document.getElementById("musteriId").value = m.id;
+        document.getElementById("firma_adi").value = m.firma_adi;
+        document.getElementById("sube_adi").value = m.sube_adi || '';
+        document.getElementById("il").value = m.il || '';
+        document.getElementById("ilce").value = m.ilce || '';
+        document.getElementById("vergi_dairesi").value = m.vergi_dairesi || '';
+        document.getElementById("vergi_no").value = m.vergi_no || '';
+        document.getElementById("adres").value = m.adres || '';
+        const fill = (id, data) => {
+            document.getElementById(id).innerHTML = "";
+            (data && data.length > 0 ? data : ['']).forEach(v => addField(id, v));
+        };
+        fill('yetkiliList', m.yetkililer);
+        fill('telList', m.telefonlar);
+        fill('sMailList', m.sertifika_mailleri);
+        fill('fMailList', m.fatura_mailleri);
+        document.getElementById("saveBtn").innerText = "💾 Güncelle";
+        if (document.getElementById("accContent").style.display !== "block") toggleAccordion();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function sil(id) {
+        if (!confirm("Bu müşteriyi silmek istediğinize emin misiniz?")) return;
+        const res = await fetch(`/api/musteriler/${id}`, { method: 'DELETE' });
+        if (res.ok) { showToast("🗑️ Müşteri silindi!"); listeYukle(); }
+        else showToast("❌ Silinemedi!", true);
+    }
+
+    async function kaydet(e) {
+        e.preventDefault();
+        const body = {
+            id: document.getElementById("musteriId").value,
+            firma_adi: document.getElementById("firma_adi").value.trim(),
+            sube_adi: document.getElementById("sube_adi").value.trim() || null,
+            il: document.getElementById("il").value,
+            ilce: document.getElementById("ilce").value,
+            vergi_dairesi: document.getElementById("vergi_dairesi").value,
+            vergi_no: document.getElementById("vergi_no").value,
+            adres: document.getElementById("adres").value,
+            yetkililer: Array.from(document.querySelectorAll(".yetkiliList-input")).map(i => i.value).filter(v => v),
+            telefonlar: Array.from(document.querySelectorAll(".telList-input")).map(i => i.value).filter(v => v),
+            sertifika_mailleri: Array.from(document.querySelectorAll(".sMailList-input")).map(i => i.value).filter(v => v),
+            fatura_mailleri: Array.from(document.querySelectorAll(".fMailList-input")).map(i => i.value).filter(v => v)
+        };
+        const res = await fetch('/api/musteriler', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+        });
+        if (res.ok) {
+            showToast(body.id ? "✅ Müşteri güncellendi!" : "✅ Müşteri kaydedildi!");
+            document.getElementById("musteriForm").reset();
+            document.getElementById("musteriId").value = "";
+            document.getElementById("saveBtn").innerText = "💾 Kaydet";
+            ['yetkiliList','telList','sMailList','fMailList'].forEach(id => {
+                document.getElementById(id).innerHTML = ""; addField(id);
+            });
+            listeYukle();
+        } else {
+            showToast("❌ Kayıt başarısız!", true);
+        }
+    }
+
+    window.onload = () => {
+        adresYukle(); listeYukle();
+        addField('yetkiliList'); addField('telList'); addField('sMailList'); addField('fMailList');
+    };
+</script>
+</body>
+</html>
