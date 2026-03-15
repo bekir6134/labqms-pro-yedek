@@ -355,6 +355,10 @@ async function yukle() {
         }
 
         document.body.setAttribute('data-render-done', 'true');
+        // iframe'den parent'a render tamamlandı mesajı gönder
+        if(window.parent !== window) {
+            window.parent.postMessage({ type: 'RENDER_DONE', id: sertId }, '*');
+        }
 
     } catch(e) {
         document.getElementById('sayfaIci').innerHTML = '<div style="padding:60px;text-align:center;color:#ef4444;">Hata: ' + e.message + '</div>';
@@ -374,7 +378,7 @@ async function pdfKaydet(mod) {
         for(let i = 0; i < sayfalar.length; i++) {
             const sayfa = sayfalar[i];
             const canvas = await html2canvas(sayfa, {
-                scale: 2,
+                scale: 3,
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: '#ffffff',
@@ -382,12 +386,12 @@ async function pdfKaydet(mod) {
                 height: sayfa.scrollHeight,
             });
 
-            const imgData = canvas.toDataURL('image/jpeg', 0.92);
+            const imgData = canvas.toDataURL('image/webp', 0.85);
             const pdfW = 210;
             const pdfH = (canvas.height * pdfW) / canvas.width;
 
             if(i > 0) pdf.addPage();
-            pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, pdfH);
+            pdf.addImage(imgData, 'WEBP', 0, 0, pdfW, pdfH);
         }
 
         if(mod === 'base64') {

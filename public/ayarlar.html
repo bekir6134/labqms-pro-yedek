@@ -422,7 +422,7 @@
             set('kd_sayac', 'kd_sayac');
             set('kd_basamak', 'kd_basamak');
             set('kd_rezerve_gun', 'kd_rezerve_gun');
-            // Şifre güvenlik nedeniyle gösterilmez
+            set('smtp_pass', 'smtp_pass'); // Şifre göster
             onizlemeGuncelle();
             kdOnizlemeGuncelle();
 
@@ -487,7 +487,7 @@
             smtp_host: document.getElementById("smtp_host").value,
             smtp_port: document.getElementById("smtp_port").value,
             smtp_user: document.getElementById("smtp_user").value,
-            smtp_pass: document.getElementById("smtp_pass").value || undefined,
+            smtp_pass: document.getElementById("smtp_pass").value,
             smtp_from_name: document.getElementById("smtp_from_name").value,
             smtp_secure: document.getElementById("smtp_secure").value,
             kd_format: document.getElementById("kd_format").value,

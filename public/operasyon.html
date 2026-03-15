@@ -1272,14 +1272,17 @@
             iframe.src = '/sertifika-onizle.html?id=' + id + '&mode=silent';
             document.body.appendChild(iframe);
 
-            const temizle = () => { try { document.body.removeChild(iframe); } catch(e) {} };
+            const temizle = () => {
+                window.removeEventListener('message', mesajDinle);
+                try { document.body.removeChild(iframe); } catch(e) {}
+            };
 
-            // Timeout
-            const timeout = setTimeout(() => { temizle(); reject(new Error('Zaman aşımı')); }, 30000);
+            // Timeout - 60 saniye (ölçüm sayfaları fazla olabilir)
+            const timeout = setTimeout(() => { temizle(); reject(new Error('Zaman aşımı')); }, 60000);
 
-            iframe.onload = () => {
-                // Sayfa yüklenince kısa bekle (ölçüm PDF render için)
-                setTimeout(async () => {
+            // postMessage ile render tamamlandı sinyali bekle
+            const mesajDinle = async (event) => {
+                if(event.data && event.data.type === 'RENDER_DONE' && String(event.data.id) === String(id)) {
                     try {
                         const base64 = await iframe.contentWindow.pdfKaydet('base64');
                         clearTimeout(timeout);
@@ -1290,8 +1293,9 @@
                         temizle();
                         reject(e);
                     }
-                }, 2000);
+                }
             };
+            window.addEventListener('message', mesajDinle);
         });
     }
 
