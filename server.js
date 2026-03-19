@@ -950,8 +950,22 @@ app.post('/api/turkak-token-yenile', async (req, res) => {
             })
         });
 
-        const data = await response.json();
-        const token = data.Token || data.token;
+        const rawText = await response.text();
+
+console.log('TÜRKAK token status:', response.status);
+console.log('TÜRKAK token raw response:', rawText);
+
+let data;
+try {
+    data = JSON.parse(rawText);
+} catch (e) {
+    return res.status(500).json({
+        error: `TÜRKAK token cevabı JSON değil. Status: ${response.status}`,
+        raw: rawText
+    });
+}
+
+const token = data.Token || data.token;
         if (!token) return res.status(401).json({ error: "Token yenilenemedi!" });
 
         const zaman = new Date().toLocaleString('tr-TR');
@@ -1508,6 +1522,143 @@ app.post('/api/sertifika-no-uret', async (req, res) => {
     }
 });
 
+
+// TÜRKAK Akredite Sertifika No Alma
+app.post('/api/turkak/akredite-no-ver-toplu', async (req, res) => {
+    try {
+
+        const { idler } = req.body;
+
+        if(!idler || !idler.length){
+            return res.status(400).json({ error: "Sertifika seçilmedi" });
+        }
+
+        const tokenResult = await pool.query(
+            "SELECT deger FROM ayarlar WHERE anahtar='turkak_token'"
+        );
+
+        if(!tokenResult.rows.length){
+            return res.status(400).json({ error: "Türkak token bulunamadı" });
+        }
+
+        const token = tokenResult.rows[0].deger;
+
+        for(const id of idler){
+
+            const s = await pool.query(`
+                SELECT s.*, m.turkak_id AS musteri_turkak_id
+                FROM sertifikalar s
+                LEFT JOIN musteriler m ON s.musteri_id = m.id
+                WHERE s.id=$1
+            `,[id]);
+
+            if(!s.rows.length) continue;
+
+            const sertifika = s.rows[0];
+
+            if(!sertifika.musteri_turkak_id){
+                console.log("Müşteri Türkak ID yok:", id);
+                continue;
+            }
+
+            const payload = [{
+                CustomerID: sertifika.musteri_turkak_id,
+                CalibrationDate: sertifika.kal_tarihi,
+                FirstReleaseDateOfTheDocument: sertifika.yayin_tarihi,
+                MachineOrDeviceType: sertifika.cihaz_adi,
+                DeviceSerialNumber: sertifika.seri_no
+            }];
+
+            const response = await fetch(
+                'https://api.turkak.org.tr/TBDS/api/v1/CalibrationService/CalibrationCertificateSaveData/',
+                {
+                    method:'POST',
+                    headers:{
+                        'Content-Type':'application/json',
+                        'Authorization': `Bearer ${token}`
+
+                    },
+                    body: JSON.stringify(payload)
+                }
+            );
+
+            const rawText = await response.text();
+
+console.log('TBDS save status:', response.status);
+console.log('TBDS save raw response:', rawText);
+console.log("TOKEN LENGTH:", token.length);
+console.log("TOKEN START:", token.slice(0,20));
+
+let data;
+try {
+    data = JSON.parse(rawText);
+} catch (e) {
+    throw new Error(`TBDS save JSON değil. Status: ${response.status}, Cevap: ${rawText}`);
+}
+
+            const turkakId =
+                data?.Item1?.[0]?.ID ||
+                data?.item1?.[0]?.id ||
+                null;
+
+            if(!turkakId){
+                console.log("Türkak ID alınamadı:", data);
+                continue;
+            }
+
+            await pool.query(
+                `UPDATE sertifikalar
+                 SET turkak_id=$2, turkak_durum='Taslak'
+                 WHERE id=$1`,
+                [id, turkakId]
+            );
+
+            await new Promise(r=>setTimeout(r,2000));
+
+            const detayRes = await fetch(
+                `https://api.turkak.org.tr/TBDS/api/v1/CalibrationService/CalibrationCertificateGetCertificate/${turkakId}`,
+                {
+                    headers:{
+                        'Authorization': `Bearer ${token}`
+
+                    }
+                }
+            );
+
+            const detayText = await detayRes.text();
+
+console.log('TBDS detail status:', detayRes.status);
+console.log('TBDS detail raw response:', detayText);
+
+let detay;
+try {
+    detay = JSON.parse(detayText);
+} catch (e) {
+    throw new Error(`TBDS detail JSON değil. Status: ${detayRes.status}, Cevap: ${detayText}`);
+}
+
+            const tbdsNo = detay?.TBDSNumber || null;
+            const turkakNo = detay?.CertificationBodyDocumentNumber || null;
+            const state = detay?.State || 'Taslak';
+
+            await pool.query(`
+                UPDATE sertifikalar
+                SET
+                sertifika_no=$2,
+                tbds_no=$3,
+                turkak_durum=$4
+                WHERE id=$1
+            `,[id, turkakNo, tbdsNo, state]);
+
+        }
+
+        res.json({ success:true });
+
+    } catch(err){
+        console.error("Türkak işlem hatası:",err);
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // İmzalı PDF'i base64 olarak döndür (onaylama imzası için)
 app.get('/api/sertifikalar/:id/imzali-pdf', async (req, res) => {

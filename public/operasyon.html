@@ -514,7 +514,7 @@
         <div class="secili-info" id="topluBilgi">0 sertifika seçildi</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn-toplu" onclick="topluKapsamDisiNo()" id="btnTopluKDNo" style="background:#fef9c3;color:#854d0e;">🔢 Kapsam Dışı No Ver</button>
-            <button class="btn-toplu" onclick="topluAkrediteNo()" id="btnTopluAkrNo" style="background:#e0f2fe;color:#0369a1;opacity:0.5;cursor:not-allowed;" disabled title="Türkak API entegrasyonu yakında">🏛️ Akredite No Ver</button>
+            <button class="btn-toplu" onclick="topluAkrediteNo()" id="btnTopluAkrNo" style="background:#e0f2fe;color:#0369a1;">🏛️ Akredite No Ver</button>
             <button class="btn-toplu" onclick="topluImzala()" id="btnTopluImzala">✍️ Seçilenleri İmzala</button>
             <button class="btn-toplu" onclick="topluOnayla()" id="btnTopluOnayla">✅ Seçilenleri Onayla</button>
             <button class="btn-toplu" onclick="topluMail()" id="btnTopluMail">📧 Seçilenlere Mail Gönder</button>
@@ -1462,9 +1462,64 @@
         }
     }
 
+    
     async function topluAkrediteNo() {
-        showToast('⏳ Türkak API entegrasyonu yakında aktif olacak.', false);
+    const idler = secilenIdler();
+    if (!idler.length) return showToast('❌ Sertifika seçin!', true);
+
+    const uygunlar = idler.filter(id => {
+        const s = tumSertifikalar.find(x => String(x.id) === String(id));
+        return s && s.asama === 'hazırlanıyor' && s.sertifika_tipi === 'akredite';
+    });
+
+    if (!uygunlar.length) {
+        return showToast('❌ Hazırlanıyor aşamasında akredite sertifika seçin!', true);
     }
+
+    if (!confirm(`${uygunlar.length} akredite sertifika için TÜRKAK / TBDS numarası alınacak. Onaylıyor musunuz?`)) {
+        return;
+    }
+
+    const btn = document.getElementById('btnTopluAkrNo');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ TÜRKAK...';
+    }
+
+    try {
+        const res = await fetch('/api/turkak/akredite-no-ver-toplu', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idler: uygunlar })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            throw new Error(data.error || 'Akredite numarası alınamadı');
+        }
+
+        let mesaj = `✅ ${data.basarili || 0} sertifika güncellendi`;
+        if (data.beklemede) mesaj += `, ${data.beklemede} sertifika taslakta kaldı`;
+        if (data.hatali) mesaj += `, ${data.hatali} sertifika hatalı`;
+
+        showToast(mesaj + '!');
+        await sertYukle();
+
+        if (data.detaylar && data.detaylar.some(x => x.durum === 'hata')) {
+            console.table(data.detaylar);
+        }
+    } catch (e) {
+        showToast('❌ ' + e.message, true);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '🏛️ Akredite No Ver';
+        }
+    }
+}
+
+    
 
     async function topluMail() {
         const idler = secilenIdler();
