@@ -440,7 +440,8 @@
                     <div style="color:#64748b;font-size:0.75rem;">${tarih}${bitis}${e.atanan_adi?' · 👤 '+e.atanan_adi:''}</div>
                     ${e.aciklama?`<div style="color:#94a3b8;font-size:0.73rem;margin-top:2px;">${e.aciklama}</div>`:''}
                 </div>
-                <button class="event-del" onclick="etkinlikSil(${e.id})">🗑️</button>
+                <button class="event-del" onclick="etkinlikDuzenle(${e.id})" style="color:#94a3b8;" title="Düzenle">✏️</button>
+                <button class="event-del" onclick="etkinlikSil(${e.id})" title="Sil">🗑️</button>
             </div>`;
         }).join('');
     }
@@ -501,6 +502,22 @@
             modalKapat();
             await takvimiYukle();
         } else showToast("❌ Kayıt başarısız!", true);
+    }
+
+    function etkinlikDuzenle(id) {
+        const e = tumEtkinlikler.find(x => x.id === id);
+        if (!e) return;
+        document.getElementById("ev_id").value = e.id;
+        document.getElementById("ev_baslik").value = e.baslik || "";
+        document.getElementById("ev_baslangic").value = e.baslangic?.substring(0,10) || "";
+        document.getElementById("ev_bitis").value = (e.bitis && e.bitis !== e.baslangic) ? e.bitis?.substring(0,10) : "";
+        document.getElementById("ev_atanan").value = e.atanan_id || "";
+        document.getElementById("ev_tip").value = e.tip || "genel";
+        document.getElementById("ev_aciklama").value = e.aciklama || "";
+        document.getElementById("modalBaslik").textContent = "✏️ Etkinliği Düzenle";
+        seciliRenk = e.renk || RENKLER[0];
+        renklerRender();
+        document.getElementById("calModal").classList.add("open");
     }
 
     async function etkinlikSil(id) {

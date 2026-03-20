@@ -15,6 +15,8 @@
         /* SIDEBAR */
         .sidebar { width: 260px; min-width: 260px; background-color: var(--sidebar-bg); color: #f8fafc; display: flex; flex-direction: column; z-index: 1000; }
         .sidebar-header { padding: 20px; font-size: 1.5rem; font-weight: 700; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 10px; color: white; }
+        #toast { visibility:hidden; min-width:260px; background:#1E40AF; color:#fff; text-align:center; border-radius:10px; padding:14px 20px; position:fixed; z-index:9999; right:24px; top:24px; font-weight:600; font-size:0.9rem; box-shadow:0 4px 16px rgba(0,0,0,0.2); opacity:0; transition:opacity 0.3s; }
+        #toast.show { visibility:visible; opacity:1; }
         .sidebar-menu { list-style: none; padding: 15px 0; margin: 0; flex-grow: 1; overflow-y: auto; }
         
         .menu-item { padding: 12px 20px; display: flex; align-items: center; gap: 12px; color: #94a3b8; text-decoration: none; font-weight: 500; transition: 0.2s; cursor: pointer; font-size: 0.9rem; }
@@ -45,6 +47,7 @@
     </style>
 </head>
 <body>
+<div id="toast"></div>
 
     <aside class="sidebar">
         <div class="sidebar-header" style="flex-direction:column; align-items:flex-start; gap:4px;">
@@ -82,6 +85,12 @@
     <div class="main-content">
         <header class="topbar">
             <div style="font-weight: 600; color: var(--primary);">LabQMS Pro Kalibrasyon Yönetim Sistemi</div>
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span id="topbarKullanici" style="font-size:0.82rem; color:#64748b; font-weight:600;"></span>
+                <button onclick="cikisYap()" style="background:#fee2e2; color:#dc2626; border:none; padding:7px 16px; border-radius:8px; font-weight:700; font-size:0.82rem; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                    🚪 Çıkış
+                </button>
+            </div>
         </header>
         <iframe name="ekran" id="ekran" src="dashboard.html"></iframe>
     </div>
@@ -120,7 +129,30 @@
             } catch(e) {}
         }
 
-        window.onload = labAdiniYukle;
+        function cikisYap() {
+            const kullanici = JSON.parse(localStorage.getItem("labqms_user") || '{}');
+            const ad = kullanici.ad_soyad || 'Kullanıcı';
+            showToast(`👋 Güle güle, ${ad}!`);
+            setTimeout(() => {
+                localStorage.removeItem("labqms_user");
+                window.location.href = "login.html";
+            }, 1500);
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById("toast");
+            t.textContent = msg;
+            t.classList.add("show");
+        }
+
+        function topbarKullaniciGoster() {
+            const kullanici = JSON.parse(localStorage.getItem("labqms_user") || '{}');
+            if (kullanici.ad_soyad) {
+                document.getElementById("topbarKullanici").textContent = "👤 " + kullanici.ad_soyad;
+            }
+        }
+
+        window.onload = () => { labAdiniYukle(); topbarKullaniciGoster(); };
     </script>
 </body>
 </html>

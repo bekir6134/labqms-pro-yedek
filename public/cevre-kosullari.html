@@ -60,6 +60,17 @@
         #toast { visibility:hidden; min-width:260px; background-color:var(--success); color:#fff; text-align:center; border-radius:8px; padding:16px; position:fixed; z-index:9999; right:30px; top:30px; font-weight:600; box-shadow:0 4px 12px rgba(0,0,0,0.15); }
         #toast.show { visibility:visible; }
         #toast.error { background-color:#ef4444; }
+        /* DROPDOWN MENÜ */
+        .act-wrap { position:relative; display:inline-block; }
+        .act-btn { background:#f8fafc; border:1px solid var(--border); padding:5px 11px; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:600; color:var(--text); white-space:nowrap; }
+        .act-btn:hover { background:#e0e7ff; border-color:#a5b4fc; color:var(--primary); }
+        .act-drop { display:none; position:absolute; right:0; top:calc(100% + 4px); background:#fff; border:1px solid var(--border); border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,0.12); z-index:200; min-width:160px; overflow:hidden; }
+        .act-wrap.open .act-drop { display:block; }
+        .act-drop-item { padding:9px 15px; cursor:pointer; font-size:0.83rem; display:flex; align-items:center; gap:8px; color:var(--text); }
+        .act-drop-item:hover { background:#f1f5f9; }
+        .act-drop-item.danger { color:#dc2626; }
+        .act-drop-item.danger:hover { background:#fee2e2; }
+        .act-drop hr { margin:4px 0; border:none; border-top:1px solid var(--border); }
     </style>
 </head>
 <body>
@@ -271,8 +282,13 @@
                 <td>${bas}</td>
                 <td style="font-size:0.78rem;color:#475569;max-width:180px;">${metin.join(' | ')||'—'}</td>
                 <td>
-                    <button class="btn-edit" onclick="duzenle(${r.id})">✏️ Düzenle</button>
-                    <button class="btn-del"  onclick="sil(${r.id})">🗑️ Sil</button>
+                    <div class="act-wrap" id="am-${r.id}">
+                        <button class="act-btn" onclick="menuToggle(${r.id},event)">İşlemler ▾</button>
+                        <div class="act-drop">
+                            <div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>
+                            <div class="act-drop-item danger" onclick="sil(${r.id});menuKapat()">🗑️ Sil</div>
+                        </div>
+                    </div>
                 </td>
             </tr>`;
         }).join('');
@@ -356,6 +372,14 @@
      "basinc_merkez","basinc_tolerans"].forEach(id => {
         document.getElementById(id).addEventListener("input", onizlemeGuncelle);
     });
+
+    function menuToggle(id, e) {
+        e.stopPropagation();
+        document.querySelectorAll('.act-wrap.open').forEach(m => { if(m.id !== 'am-'+id) m.classList.remove('open'); });
+        document.getElementById('am-'+id).classList.toggle('open');
+    }
+    function menuKapat() { document.querySelectorAll('.act-wrap.open').forEach(m => m.classList.remove('open')); }
+    document.addEventListener('click', menuKapat);
 
     window.onload = yukle;
 </script>

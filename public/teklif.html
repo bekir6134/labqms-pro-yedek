@@ -80,6 +80,13 @@
         .durum-Taslak { background: #f1f5f9; color: #64748b; }
         .durum-Onaylandı { background: #dcfce7; color: #166534; }
         .durum-Reddedildi { background: #fee2e2; color: #dc2626; }
+        .durum-select { outline: none; }
+        .durum-sel-Taslak { background: #f1f5f9; color: #64748b; }
+        .durum-sel-Gönderildi { background: #e0f2fe; color: #0369a1; }
+        .durum-sel-Onaylandı { background: #dcfce7; color: #166534; }
+        .durum-sel-Reddedildi { background: #fee2e2; color: #dc2626; }
+        .mail-chip { display:inline-flex; align-items:center; gap:5px; background:#e0e7ff; color:#4338ca; padding:4px 10px; border-radius:20px; font-size:0.82rem; font-weight:600; }
+        .mail-chip button { background:none; border:none; cursor:pointer; color:#4338ca; font-size:1rem; padding:0; line-height:1; }
         .btn-view { background: #dcfce7; color: #059669; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.78rem; font-weight: 600; margin-right: 4px; }
         .btn-edit { background: #e0e7ff; color: #4338ca; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.78rem; font-weight: 600; margin-right: 4px; }
         .btn-del { background: #fee2e2; color: #dc2626; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.78rem; font-weight: 600; }
@@ -109,10 +116,40 @@
         #toast { visibility: hidden; min-width: 260px; background-color: var(--success); color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 9999; right: 30px; top: 30px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         #toast.show { visibility: visible; }
         #toast.error { background-color: #ef4444; }
+        /* DROPDOWN MENÜ */
+        .act-wrap { position:relative; display:inline-block; }
+        .act-btn { background:#f8fafc; border:1px solid var(--border); padding:5px 11px; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:600; color:var(--text); white-space:nowrap; }
+        .act-btn:hover { background:#e0e7ff; border-color:#a5b4fc; color:var(--primary); }
+        .act-drop { display:none; position:absolute; right:0; top:calc(100% + 4px); background:#fff; border:1px solid var(--border); border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,0.12); z-index:200; min-width:160px; overflow:hidden; }
+        .act-wrap.open .act-drop { display:block; }
+        .act-drop-item { padding:9px 15px; cursor:pointer; font-size:0.83rem; display:flex; align-items:center; gap:8px; color:var(--text); }
+        .act-drop-item:hover { background:#f1f5f9; }
+        .act-drop-item.danger { color:#dc2626; }
+        .act-drop-item.danger:hover { background:#fee2e2; }
+        .act-drop hr { margin:4px 0; border:none; border-top:1px solid var(--border); }
     </style>
 </head>
 <body>
 <div id="toast"></div>
+
+<!-- MAİL MODALI -->
+<div id="mailModal" style="display:none;position:fixed;z-index:2000;inset:0;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:14px;width:90%;max-width:520px;padding:28px;position:relative;">
+        <button onclick="mailModalKapat()" style="position:absolute;right:16px;top:16px;background:none;border:none;font-size:20px;cursor:pointer;color:#64748b;">✕</button>
+        <h3 style="margin:0 0 6px;color:var(--primary);">📧 Teklif Gönder</h3>
+        <p id="mailTeklifBilgi" style="font-size:0.85rem;color:#64748b;margin:0 0 18px;"></p>
+        <div style="margin-bottom:14px;">
+            <label style="font-size:0.8rem;font-weight:700;color:#64748b;">Alıcı Adresler</label>
+            <div id="mailChipArea" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:36px;padding:8px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:18px;">
+            <input type="email" id="manuelMailInput" placeholder="manuel@mail.com ekle..." style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.9rem;">
+            <button onclick="mailEkle()" style="background:var(--primary);color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;">Ekle</button>
+        </div>
+        <div id="mailUyari" style="display:none;background:#fee2e2;color:#dc2626;padding:8px 12px;border-radius:6px;font-size:0.85rem;margin-bottom:12px;"></div>
+        <button id="mailGonderBtn" onclick="mailGonder()" style="background:var(--success);color:white;border:none;padding:12px 28px;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.95rem;width:100%;">📨 Teklifi Gönder</button>
+    </div>
+</div>
 
 <!-- GÖRÜNTÜLEME MODALI -->
 <div id="modal">
@@ -188,6 +225,27 @@
                     <input type="number" id="adet" value="1" min="1">
                 </div>
             </div>
+            <div class="form-grid" style="grid-template-columns:2fr 1fr 1fr; gap:12px; margin-top:12px;">
+                <div>
+                    <label>Özellik-Not <span style="font-weight:400;color:#94a3b8;">(kapsam aralığı, tek set vb.)</span></label>
+                    <input type="text" id="ozellik_not" placeholder="Örn: Tek set, 0-150 mm aralığı...">
+                </div>
+                <div>
+                    <label>Hizmet Şekli</label>
+                    <select id="hizmet_sekli">
+                        <option value="Müşteri Yerinde">Müşteri Yerinde</option>
+                        <option value="Kalibrasyon Laboratuvarında">Kalibrasyon Laboratuvarında</option>
+                        <option value="Tedarikçi Firmada">Tedarikçi Firmada</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Kapsam Durumu</label>
+                    <select id="kapsam_durumu">
+                        <option value="Akredite">Akredite</option>
+                        <option value="Kapsam Dışı">Kapsam Dışı</option>
+                    </select>
+                </div>
+            </div>
             <div style="margin-top:12px; text-align:right;">
                 <button class="btn-add" onclick="teklifeEkle()">➕ Kaleme Ekle</button>
             </div>
@@ -197,16 +255,19 @@
         <table class="inner-table">
             <thead>
                 <tr>
-                    <th style="width:40px;">#</th>
+                    <th style="width:30px;">#</th>
                     <th>Cihaz / Hizmet</th>
-                    <th style="width:70px; text-align:center;">Adet</th>
-                    <th style="width:120px;">Birim Fiyat</th>
-                    <th style="width:130px;">Toplam</th>
-                    <th style="width:40px;"></th>
+                    <th>Özellik-Not</th>
+                    <th style="width:130px;">Hizmet Şekli</th>
+                    <th style="width:80px;">Kapsam</th>
+                    <th style="width:55px; text-align:center;">Adet</th>
+                    <th style="width:110px;">Birim Fiyat</th>
+                    <th style="width:110px;">Toplam</th>
+                    <th style="width:35px;"></th>
                 </tr>
             </thead>
             <tbody id="teklifBody">
-                <tr class="no-data-inner"><td colspan="6">Henüz kalem eklenmedi.</td></tr>
+                <tr class="no-data-inner"><td colspan="9">Henüz kalem eklenmedi.</td></tr>
             </tbody>
         </table>
 
@@ -215,6 +276,26 @@
             <label>🏷️ İndirim (%)</label>
             <input type="number" id="indirim" value="0" min="0" max="100" oninput="toplamHesapla()">
             <span id="indirimTutar" style="color:#92400e; font-size:0.85rem; font-weight:600;"></span>
+        </div>
+
+        <!-- YOL & KONAKLAMA -->
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:12px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:12px;">
+            <div>
+                <label>🚗 Yol Ücreti</label>
+                <input type="number" id="yol_ucreti" value="0" min="0" placeholder="0.00" oninput="toplamHesapla()">
+            </div>
+            <div>
+                <label>🏨 Konaklama Ücreti</label>
+                <input type="number" id="konaklama_ucreti" value="0" min="0" placeholder="0.00" oninput="toplamHesapla()">
+            </div>
+            <div>
+                <label>📊 KDV Oranı (%)</label>
+                <select id="kdv_oran" onchange="toplamHesapla()" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.9rem;">
+                    <option value="0">%0 KDV Yok</option>
+                    <option value="10">%10 KDV</option>
+                    <option value="20" selected>%20 KDV</option>
+                </select>
+            </div>
         </div>
 
         <!-- ÖZET + KAYDET -->
@@ -266,6 +347,7 @@
     let musteriler = [];
     let satirlar = [];
     let tumTeklifler = [];
+    let ayarlar = {};
 
     // ── ACCORDION ──
     function toggleAccordion() {
@@ -290,10 +372,13 @@
 
     // ── VERİ YÜKLEMESİ ──
     async function sayfaYukle() {
-        const res = await fetch('/api/teklif-on-veriler');
-        const data = await res.json();
-        musteriler = data.musteriler;
-        cihazVerileri = data.cihazlar;
+        const [onVeriler, ayarlarRes] = await Promise.all([
+            fetch('/api/teklif-on-veriler').then(r=>r.json()),
+            fetch('/api/ayarlar').then(r=>r.json())
+        ]);
+        musteriler = onVeriler.musteriler;
+        cihazVerileri = onVeriler.cihazlar;
+        ayarlar = ayarlarRes;
         const fSel = document.getElementById("firma_adi");
         fSel.innerHTML = '<option value="">-- Firma Seçin --</option>' +
             musteriler.map(m => `<option value="${m.id}">${m.firma_adi}</option>`).join('');
@@ -349,12 +434,18 @@
         const fiyat = parseFloat(document.getElementById("birim_fiyat").value);
         const pb = document.getElementById("para_birimi").value;
         const adet = parseInt(document.getElementById("adet").value) || 1;
+        const ozellik_not = document.getElementById("ozellik_not").value.trim();
+        const hizmet_sekli = document.getElementById("hizmet_sekli").value;
+        const kapsam_durumu = document.getElementById("kapsam_durumu").value;
         if (!ad || !fiyat) { showToast("❌ Cihaz ve fiyat giriniz!", true); return; }
-        satirlar.push({ad, fiyat, pb, adet});
+        satirlar.push({ad, fiyat, pb, adet, ozellik_not, hizmet_sekli, kapsam_durumu});
         renderKalemler();
         document.getElementById("cihaz_adi").value = "";
         document.getElementById("birim_fiyat").value = "";
         document.getElementById("adet").value = "1";
+        document.getElementById("ozellik_not").value = "";
+        document.getElementById("hizmet_sekli").value = "Müşteri Yerinde";
+        document.getElementById("kapsam_durumu").value = "Akredite";
     }
 
     function kalemSil(i) { satirlar.splice(i,1); renderKalemler(); }
@@ -362,13 +453,16 @@
     function renderKalemler() {
         const tbody = document.getElementById("teklifBody");
         if (!satirlar.length) {
-            tbody.innerHTML='<tr class="no-data-inner"><td colspan="6">Henüz kalem eklenmedi.</td></tr>';
+            tbody.innerHTML='<tr class="no-data-inner"><td colspan="9">Henüz kalem eklenmedi.</td></tr>';
             toplamHesapla(); return;
         }
         tbody.innerHTML = satirlar.map((s,i) => `
             <tr>
                 <td><span class="row-num">${i+1}</span></td>
                 <td><strong>${s.ad}</strong></td>
+                <td><small style="color:#475569;">${s.ozellik_not || '-'}</small></td>
+                <td><small style="color:#475569;">${s.hizmet_sekli || '-'}</small></td>
+                <td><span style="font-size:0.72rem;font-weight:700;padding:2px 5px;border-radius:4px;background:${s.kapsam_durumu==='Akredite'?'#dcfce7':'#dbeafe'};color:${s.kapsam_durumu==='Akredite'?'#166534':'#1e40af'};">${s.kapsam_durumu||'-'}</span></td>
                 <td style="text-align:center;">${s.adet}</td>
                 <td class="price-green">${s.fiyat.toLocaleString('tr-TR',{minimumFractionDigits:2})} ${s.pb}</td>
                 <td class="price-green">${(s.fiyat*s.adet).toLocaleString('tr-TR',{minimumFractionDigits:2})} ${s.pb}</td>
@@ -379,13 +473,18 @@
 
     function toplamHesapla() {
         const ind = parseFloat(document.getElementById("indirim").value)||0;
+        const yol = parseFloat(document.getElementById("yol_ucreti").value)||0;
+        const kon = parseFloat(document.getElementById("konaklama_ucreti").value)||0;
+        const kdvOran = parseFloat(document.getElementById("kdv_oran").value)||0;
         const ara = satirlar.reduce((s,k)=>s+k.fiyat*k.adet, 0);
         const indTutar = ara*ind/100;
-        const genel = ara-indTutar;
+        const kdvHaric = (ara-indTutar) + yol + kon;
+        const kdvTutar = kdvHaric * kdvOran / 100;
+        const kdvDahil = kdvHaric + kdvTutar;
         const pb = satirlar.length>0?satirlar[0].pb:'₺';
         document.getElementById("kalemSayisi").textContent = satirlar.length+" kalem";
         document.getElementById("araToplam").textContent = ara.toLocaleString('tr-TR',{minimumFractionDigits:2})+' '+pb;
-        document.getElementById("genelToplam").textContent = genel.toLocaleString('tr-TR',{minimumFractionDigits:2})+' '+pb;
+        document.getElementById("genelToplam").textContent = `KDV Hariç: ${kdvHaric.toLocaleString('tr-TR',{minimumFractionDigits:2})} ${pb} | KDV Dahil: ${kdvDahil.toLocaleString('tr-TR',{minimumFractionDigits:2})} ${pb}`;
         document.getElementById("indirimTutar").textContent = ind>0?`− ${indTutar.toLocaleString('tr-TR',{minimumFractionDigits:2})} ${pb} indirim`:'';
     }
 
@@ -396,16 +495,20 @@
         if (!musteriId) return showToast("❌ Firma seçin!", true);
         if (!satirlar.length) return showToast("❌ En az bir kalem ekleyin!", true);
         const ind = parseFloat(document.getElementById("indirim").value)||0;
+        const yol = parseFloat(document.getElementById("yol_ucreti").value)||0;
+        const kon = parseFloat(document.getElementById("konaklama_ucreti").value)||0;
+        const kdvOran = parseFloat(document.getElementById("kdv_oran").value)||0;
         const ara = satirlar.reduce((s,k)=>s+k.fiyat*k.adet,0);
-        const genel = ara - ara*ind/100;
+        const kdvHaric = (ara - ara*ind/100) + yol + kon;
+        const kalemlerData = { items: satirlar, yol_ucreti: yol, konaklama_ucreti: kon, kdv_oran: kdvOran };
         const payload = {
             musteri_id: musteriId,
             teklif_tarihi: document.getElementById("teklif_tarihi").value,
             gecerlilik_gun: document.getElementById("gecerlilik").value,
             teklif_notu: document.getElementById("teklif_notu").value,
-            indirim_oran: ind, ara_toplam: ara, genel_toplam: genel,
+            indirim_oran: ind, ara_toplam: ara, genel_toplam: kdvHaric,
             para_birimi: satirlar[0]?.pb||'₺',
-            kalemler: satirlar
+            kalemler: kalemlerData
         };
         const btn = document.getElementById("kaydetBtn");
         btn.disabled=true; btn.textContent="Kaydediliyor...";
@@ -429,63 +532,379 @@
     function renderListe(data) {
         const tbody = document.getElementById("teklifListe");
         if (!data.length) { tbody.innerHTML='<tr class="empty-row"><td colspan="7">Henüz teklif kaydı bulunmuyor.</td></tr>'; return; }
+        const durumlar = ['Taslak','Gönderildi','Onaylandı','Reddedildi'];
         tbody.innerHTML = data.map(t => {
             const firma = t.firma_adi + (t.sube_adi ? ` <span style="color:#64748b;font-size:0.78rem;">/ ${t.sube_adi}</span>` : '');
             const tarih = t.teklif_tarihi ? new Date(t.teklif_tarihi).toLocaleDateString('tr-TR') : '-';
             const durum = t.durum || 'Taslak';
+            const durumOptions = durumlar.map(d => `<option value="${d}" ${d===durum?'selected':''}>${d}</option>`).join('');
             return `<tr>
                 <td><strong style="color:var(--primary);">${t.teklif_no||'-'}</strong></td>
                 <td>${firma}</td>
                 <td>${tarih}</td>
                 <td>${t.gecerlilik_gun||30} Gün</td>
                 <td class="price-green">${parseFloat(t.genel_toplam||0).toLocaleString('tr-TR',{minimumFractionDigits:2})} ${t.para_birimi||'₺'}</td>
-                <td><span class="durum-badge durum-${durum}">${durum}</span></td>
                 <td>
-                    <button class="btn-view" onclick="goruntule(${t.id})">👁️ Görüntüle</button>
-                    <button class="btn-edit" onclick="duzenle(${t.id})">✏️ Düzenle</button>
-                    <button class="btn-del" onclick="sil(${t.id})">🗑️ Sil</button>
+                    <select class="durum-select durum-sel-${durum}" onchange="durumDegistir(${t.id}, this.value, this)"
+                        style="padding:4px 8px;border-radius:6px;font-size:0.78rem;font-weight:700;border:1px solid #e2e8f0;cursor:pointer;">
+                        ${durumOptions}
+                    </select>
+                </td>
+                <td>
+                    <div class="act-wrap" id="am-${t.id}">
+                        <button class="act-btn" onclick="menuToggle(${t.id},event)">İşlemler ▾</button>
+                        <div class="act-drop">
+                            <div class="act-drop-item" onclick="pdfGoruntule(${t.id});menuKapat()">📄 PDF Önizle</div>
+                            <div class="act-drop-item" onclick="teklifGonder(${t.id});menuKapat()">📧 Gönder</div>
+                            <hr>
+                            <div class="act-drop-item" onclick="duzenle(${t.id});menuKapat()">✏️ Düzenle</div>
+                            <div class="act-drop-item danger" onclick="sil(${t.id});menuKapat()">🗑️ Sil</div>
+                        </div>
+                    </div>
                 </td>
             </tr>`;
         }).join('');
     }
 
-    // ── GÖRÜNTÜLE ──
-    function goruntule(id) {
-        const t = tumTeklifler.find(x=>x.id===id);
+    // ── PDF GÖRÜNTÜLE ──
+    function pdfGoruntule(id) {
+        const t = tumTeklifler.find(x => x.id === id);
         if (!t) return;
-        const kalemler = Array.isArray(t.kalemler) ? t.kalemler : JSON.parse(t.kalemler||'[]');
+
+        // Parse kalemler (yeni veya eski format)
+        let kdObj = typeof t.kalemler === 'object' && !Array.isArray(t.kalemler)
+            ? t.kalemler
+            : (Array.isArray(t.kalemler) ? {items:t.kalemler, yol_ucreti:0, konaklama_ucreti:0, kdv_oran:20}
+               : (() => { try { const p = JSON.parse(t.kalemler||'{}'); return Array.isArray(p)?{items:p,yol_ucreti:0,konaklama_ucreti:0,kdv_oran:20}:p; } catch(e){return {items:[],yol_ucreti:0,konaklama_ucreti:0,kdv_oran:20};} })());
+        const kalemler = kdObj.items || [];
+        const yolUcreti = parseFloat(kdObj.yol_ucreti) || 0;
+        const konaklamaUcreti = parseFloat(kdObj.konaklama_ucreti) || 0;
+        const kdvOran = kdObj.kdv_oran != null ? parseFloat(kdObj.kdv_oran) : 20;
+
         const tarih = t.teklif_tarihi ? new Date(t.teklif_tarihi).toLocaleDateString('tr-TR') : '-';
-        document.getElementById("modalIcerik").innerHTML = `
-            <h2 style="margin:0 0 20px; color:var(--primary);">📄 ${t.teklif_no}</h2>
-            <div class="modal-section">
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
-                    <div><div class="modal-label">Firma</div><div class="modal-value">${t.firma_adi}${t.sube_adi?' / '+t.sube_adi:''}</div></div>
-                    <div><div class="modal-label">Teklif Tarihi</div><div class="modal-value">${tarih}</div></div>
-                    <div><div class="modal-label">Geçerlilik</div><div class="modal-value">${t.gecerlilik_gun||30} Gün</div></div>
-                    <div><div class="modal-label">Durum</div><div class="modal-value"><span class="durum-badge durum-${t.durum||'Taslak'}">${t.durum||'Taslak'}</span></div></div>
-                    ${t.teklif_notu?`<div class="full"><div class="modal-label">Not</div><div class="modal-value">${t.teklif_notu}</div></div>`:''}
-                </div>
-            </div>
-            <div class="modal-section">
-                <div class="modal-label" style="margin-bottom:8px;">Kalemler</div>
-                <table class="modal-table">
-                    <thead><tr><th>#</th><th>Cihaz</th><th>Adet</th><th>Birim</th><th>Toplam</th></tr></thead>
-                    <tbody>${kalemler.map((k,i)=>`<tr>
-                        <td>${i+1}</td><td>${k.ad}</td><td>${k.adet}</td>
-                        <td>${parseFloat(k.fiyat).toLocaleString('tr-TR',{minimumFractionDigits:2})} ${k.pb}</td>
-                        <td><strong>${(k.fiyat*k.adet).toLocaleString('tr-TR',{minimumFractionDigits:2})} ${k.pb}</strong></td>
-                    </tr>`).join('')}</tbody>
-                </table>
-            </div>
-            <div style="background:var(--primary); color:white; border-radius:10px; padding:15px 20px; display:flex; justify-content:space-between; align-items:center;">
-                <div><div style="font-size:0.75rem; opacity:0.75;">Ara Toplam</div><div style="font-weight:700;">${parseFloat(t.ara_toplam||0).toLocaleString('tr-TR',{minimumFractionDigits:2})} ${t.para_birimi}</div></div>
-                ${t.indirim_oran>0?`<div><div style="font-size:0.75rem; opacity:0.75;">İndirim (%${t.indirim_oran})</div><div style="font-weight:700;">− ${(t.ara_toplam*t.indirim_oran/100).toLocaleString('tr-TR',{minimumFractionDigits:2})} ${t.para_birimi}</div></div>`:''}
-                <div style="text-align:right;"><div style="font-size:0.75rem; opacity:0.75;">Genel Toplam</div><div style="font-size:1.3rem; font-weight:800;">${parseFloat(t.genel_toplam||0).toLocaleString('tr-TR',{minimumFractionDigits:2})} ${t.para_birimi}</div></div>
-            </div>`;
-        document.getElementById("modal").classList.add("open");
+
+        // Müşteri detayları
+        let yetkililer = [];
+        try { yetkililer = typeof t.yetkililer === 'string' ? JSON.parse(t.yetkililer) : (t.yetkililer || []); } catch(e) {}
+        let telefonlar = [];
+        try { telefonlar = typeof t.telefonlar === 'string' ? JSON.parse(t.telefonlar) : (t.telefonlar || []); } catch(e) {}
+        const ilgiliKisi = yetkililer.length > 0 ? (yetkililer[0].ad || yetkililer[0]) : '-';
+        const telefon = telefonlar.length > 0 ? (telefonlar[0].numara || telefonlar[0]) : '-';
+        const adresTam = [t.adres, t.ilce, t.il].filter(Boolean).join(', ') || '-';
+
+        // Ayarlardan logolar ve firma ünvanı
+        const labLogo = ayarlar.lab_logo || '';
+        const turkakLogo = ayarlar.turkak_logo || '';
+        const labAdi = ayarlar.lab_adi || 'KALİBRASYON LABORATUVARI';
+
+        // Tutarlar
+        const araToplam = parseFloat(t.ara_toplam || 0);
+        const indOran = parseFloat(t.indirim_oran || 0);
+        const indTutar = araToplam * indOran / 100;
+        const kalibNetToplam = araToplam - indTutar;
+        const kdvHaric = kalibNetToplam + yolUcreti + konaklamaUcreti;
+        const kdvTutar = kdvHaric * kdvOran / 100;
+        const kdvDahil = kdvHaric + kdvTutar;
+        const pb = t.para_birimi || '₺';
+
+        const fmt = (v) => parseFloat(v||0).toLocaleString('tr-TR', {minimumFractionDigits:2});
+
+        const kalemlerHTML = kalemler.map((k, i) => `
+            <tr>
+                <td>${i + 1}</td>
+                <td><strong>${k.ad || ''}</strong></td>
+                <td style="font-size:9px;color:#475569;">${k.ozellik_not || '-'}</td>
+                <td style="font-size:9px;">${k.hizmet_sekli || '-'}</td>
+                <td><span style="padding:2px 5px;border-radius:3px;font-size:9px;font-weight:bold;background:${k.kapsam_durumu === 'Akredite' ? '#dcfce7' : '#dbeafe'};color:${k.kapsam_durumu === 'Akredite' ? '#166534' : '#1e40af'};">${k.kapsam_durumu || '-'}</span></td>
+                <td style="text-align:center;">${k.adet || 1}</td>
+                <td style="text-align:right;">${fmt(k.fiyat)} ${k.pb || pb}</td>
+                <td style="text-align:right;font-weight:bold;">${fmt((k.fiyat||0)*(k.adet||1))} ${k.pb || pb}</td>
+            </tr>`).join('');
+
+
+        const html = `<!DOCTYPE html>
+<html lang="tr"><head><meta charset="UTF-8"><title>Teklif ${t.teklif_no}</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; padding: 20px 28px; color: #1e293b; font-size: 11px; }
+.toolbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:15px; background:#f1f5f9; padding:10px 14px; border-radius:8px; }
+.toolbar-note { font-size:10px; color:#64748b; }
+.toolbar button { background:#1E40AF; color:white; border:none; padding:9px 20px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; }
+.header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid #1E40AF; }
+.header-left { display:flex; align-items:center; gap:10px; }
+.header-logo { max-height:60px; max-width:120px; object-fit:contain; }
+.header-center { text-align:center; flex:1; }
+.co-name { font-size:15px; font-weight:bold; color:#1E40AF; }
+.co-sub { font-size:9px; color:#64748b; margin-top:2px; }
+.doc-label { font-size:11px; font-weight:bold; color:#1E40AF; border:2px solid #1E40AF; padding:4px 10px; border-radius:4px; white-space:nowrap; }
+.info-grid { display:grid; grid-template-columns:1.4fr 0.6fr; gap:10px; margin-bottom:12px; }
+.info-box { background:#f8fafc; padding:10px 12px; border-radius:6px; border:1px solid #e2e8f0; }
+.sec-title { font-size:9px; font-weight:bold; color:#1E40AF; margin-bottom:7px; border-bottom:1px solid #e2e8f0; padding-bottom:4px; }
+.row { margin-bottom:5px; }
+.lbl { font-size:8px; font-weight:bold; color:#94a3b8; text-transform:uppercase; margin-bottom:1px; }
+.val { font-size:11px; color:#1e293b; }
+table { width:100%; border-collapse:collapse; margin-bottom:10px; }
+thead { background:#1E40AF; color:white; }
+th { padding:6px 5px; text-align:left; font-size:8.5px; }
+td { padding:5px 5px; border-bottom:1px solid #e2e8f0; vertical-align:middle; font-size:10px; }
+tbody tr:nth-child(even) { background:#f8fafc; }
+.totals-box { margin-top:8px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; }
+.totals-row { display:flex; flex-direction:column; align-items:flex-end; }
+.totals-item { padding:5px 16px; border-top:1px solid #e2e8f0; text-align:right; width:100%; display:flex; justify-content:space-between; align-items:center; }
+.totals-item:first-child { border-top:none; }
+.t-lbl { font-size:9px; color:#64748b; }
+.t-val { font-size:11px; font-weight:bold; }
+.totals-final { background:#1E40AF; color:white; display:flex; justify-content:space-between; align-items:center; padding:10px 16px; }
+.t-main-lbl { font-size:9px; opacity:0.8; }
+.t-main-val { font-size:14px; font-weight:800; }
+.note-box { background:#fffbeb; border:1px solid #fde68a; padding:7px 12px; border-radius:6px; margin-bottom:10px; font-size:10px; }
+.page-break { page-break-before:always; padding-top:20px; }
+.aciklamalar { font-size:9.5px; line-height:1.6; }
+.aciklamalar h3 { font-size:11px; color:#1E40AF; margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:4px; }
+.aciklamalar ol { padding-left:18px; }
+.aciklamalar li { margin-bottom:5px; }
+.signature-area { display:grid; grid-template-columns:1fr 1fr; gap:30px; margin-top:30px; }
+.sig-box { border:1px solid #e2e8f0; border-radius:8px; padding:15px; }
+.sig-title { font-size:10px; font-weight:bold; color:#1E40AF; margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:5px; }
+.sig-line { border-top:1px solid #94a3b8; margin-top:40px; padding-top:6px; font-size:9px; color:#64748b; }
+.karar-kuralı { margin-top:12px; padding:10px; border:1px solid #e2e8f0; border-radius:6px; background:#f8fafc; }
+@media print {
+    .toolbar { display:none !important; }
+    body { padding:12px 18px; }
+    @page { size:A4; margin:10mm 8mm; }
+    .page-break { page-break-before:always; }
+}
+</style></head><body>
+<div class="toolbar">
+    <span class="toolbar-note">💡 PDF kaydetmek için: Yazdır penceresinde <strong>"Üst ve alt bilgileri"</strong> seçeneğini kaldırın</span>
+    <button onclick="window.print()">🖨️ PDF Kaydet / Yazdır</button>
+</div>
+
+<!-- SAYFA 1 -->
+<div class="header">
+    <div class="header-left">
+        ${labLogo ? `<img class="header-logo" src="${labLogo}" alt="Logo">` : ''}
+    </div>
+    <div class="header-center">
+        <div class="co-name">${labAdi}</div>
+        <div class="co-sub">Kalibrasyon ve Test Hizmetleri / Calibration and Testing Services</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+        ${turkakLogo ? `<img class="header-logo" src="${turkakLogo}" alt="Türkak Logo">` : ''}
+        <div class="doc-label">TEKLİF<br>QUOTATION</div>
+    </div>
+</div>
+
+<div class="info-grid">
+    <div class="info-box">
+        <div class="sec-title">FİRMA BİLGİLERİ / COMPANY INFORMATION</div>
+        <div class="row"><div class="lbl">Firma Adı / Company Name</div><div class="val" style="font-weight:bold;">${t.firma_adi || ''}${t.sube_adi ? ' / ' + t.sube_adi : ''}</div></div>
+        <div class="row"><div class="lbl">Adres / Address</div><div class="val">${adresTam}</div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">
+            <div><div class="lbl">İlgili Kişi / Contact</div><div class="val">${ilgiliKisi}</div></div>
+            <div><div class="lbl">Telefon / Phone</div><div class="val">${telefon}</div></div>
+        </div>
+    </div>
+    <div class="info-box">
+        <div class="sec-title">TEKLİF BİLGİLERİ / QUOTATION DETAILS</div>
+        <div class="row"><div class="lbl">Teklif No / Ref. No</div><div class="val" style="font-weight:bold;color:#1E40AF;">${t.teklif_no}</div></div>
+        <div class="row"><div class="lbl">Tarih / Date</div><div class="val">${tarih}</div></div>
+        <div class="row"><div class="lbl">Geçerlilik / Validity</div><div class="val">${t.gecerlilik_gun || 30} Gün / Days</div></div>
+    </div>
+</div>
+
+${t.teklif_notu ? `<div class="note-box"><strong>Not / Note:</strong> ${t.teklif_notu}</div>` : ''}
+
+<table>
+    <thead><tr>
+        <th style="width:20px;">#</th>
+        <th>Cihaz / Hizmet - Device / Service</th>
+        <th style="width:95px;">Özellik-Not / Feature</th>
+        <th style="width:105px;">Hizmet Şekli / Service Type</th>
+        <th style="width:62px;">Kapsam / Scope</th>
+        <th style="width:32px;text-align:center;">Adet / Qty</th>
+        <th style="width:72px;text-align:right;">Birim / Unit</th>
+        <th style="width:72px;text-align:right;">Toplam / Total</th>
+    </tr></thead>
+    <tbody>
+        ${kalemlerHTML}
+    </tbody>
+</table>
+
+<div class="totals-box">
+    <div class="totals-row">
+        <div class="totals-item"><div class="t-lbl">Kalibrasyon Ara Toplam / Subtotal</div><div class="t-val">${fmt(araToplam)} ${pb}</div></div>
+        ${indOran > 0 ? `<div class="totals-item"><div class="t-lbl">İndirim / Discount (%${indOran})</div><div class="t-val" style="color:#dc2626;">− ${fmt(indTutar)} ${pb}</div></div>` : ''}
+        ${yolUcreti > 0 ? `<div class="totals-item"><div class="t-lbl">🚗 Yol Ücreti / Travel Fee</div><div class="t-val">${fmt(yolUcreti)} ${pb}</div></div>` : ''}
+        ${konaklamaUcreti > 0 ? `<div class="totals-item"><div class="t-lbl">🏨 Konaklama Ücreti / Accommodation Fee</div><div class="t-val">${fmt(konaklamaUcreti)} ${pb}</div></div>` : ''}
+        <div class="totals-item" style="background:#f0f9ff;"><div class="t-lbl" style="color:#0369a1;font-weight:bold;">KDV Hariç Toplam / Total Excl. VAT</div><div class="t-val" style="color:#0369a1;">${fmt(kdvHaric)} ${pb}</div></div>
+        ${kdvOran > 0 ? `<div class="totals-item"><div class="t-lbl">KDV (%${kdvOran}) / VAT</div><div class="t-val">${fmt(kdvTutar)} ${pb}</div></div>` : ''}
+    </div>
+    <div class="totals-final">
+        <div><div class="t-main-lbl">GENEL TOPLAM (KDV DAHİL) / GRAND TOTAL (VAT INC.)</div></div>
+        <div class="t-main-val">${fmt(kdvDahil)} ${pb}</div>
+    </div>
+</div>
+
+<!-- SAYFA 2 -->
+<div class="page-break">
+<div class="aciklamalar">
+<h3>C - AÇIKLAMALAR / TERMS & CONDITIONS</h3>
+<ol>
+<li>Fiyatlara KDV dahil değildir. / Prices are exclusive of VAT.</li>
+<li>Ödeme, sertifika tesliminden önce nakit ya da karşılıklı anlaşılan ve Müşteri tarafından yazılı teyid edilen şartlarda tahsil edilir.</li>
+<li>Bu sözleşmede verilmiş olan toplam fiyat, mevcut cihaz sayısına göre belirlenmiş olup, cihaz sayısının değişmesi durumunda AYER Kalibrasyon laboratuvarı sözleşmeyi değiştirme hakkına sahiptir.</li>
+<li>Laboratuarımıza gelen/gönderilen cihazların kayıt ve kabul işlemleri görsel kontrol ile yapılmaktadır. Görsel kontrol hiçbir şekilde fonksiyon kontrolünü kapsamaz.</li>
+<li>Müşterinin kendi tesislerinde yapılacak kalibrasyon hizmetlerinde, kalibrasyona tabi tutulacak cihazları sökme ve takma sorumluluğu hizmet alan Müşteriye aittir. Sökme ve takma işlemlerinden dolayı oluşabilecek hasarlardan AYER Kalibrasyon sorumlu değildir.</li>
+<li>Bu sözleşmenin yorumundan ve uygulanmasından doğacak anlaşmazlıkların çözüm yeri, İstanbul Anadolu Adliyesi Mahkemeleridir.</li>
+<li>Ayer Kalibrasyon tarafından istendiği takdirde Cihaza ait teknik el kitabı, gerekli aksesuarlar ve donanım, son kalibrasyon sertifikası kalibre edilecek Cihaz/Alet ile getirilmesi gerekebilir.</li>
+<li>Teslim ve Taşımada olabilecek gecikme ve hasarlardan firmamız sorumlu değildir. Kargo ve Nakliye ücretleri müşteriye aittir.</li>
+<li>Herhangi bir nedenle (tahribat, kaybolma, yırtılma v.b.) Müşteri tarafından Kalibrasyon Sertifikasının yenilenmesi talebi durumunda, kalibrasyon bedelinin %10'u kadar ücretlendirme yapılır.</li>
+<li>Kalibrasyon işlemine alınan cihazın/cihazların yapılan ölçümler esnasında veya sonunda hatalı veya arızalı olduğu tespit edilmesi durumunda, kalibrasyon bedelinin %50'si faturaya ilave edilir.</li>
+<li>Yazılı teklif almadan cihazların gönderilmesi durumunda sözleşmedeki şartlar Müşteri tarafından aynen kabul edilmiş sayılır.</li>
+<li>Cihazın Sertifikalandırılması ayar ve tamir işlemini kapsamaz. Ayer Kalibrasyon personeli tarafından tamire ihtiyaç duyulan cihaz, müşteri onayı alındıktan sonra tamir edilir ve tamir bedeli müşterimizin faturasına ilave edilir.</li>
+<li>Kalibrasyonu yapılacak cihaz veya aletin özel ölçme aralığı veya ilave ölçüm noktaları varsa teslim anında bildirilmelidir. Bildirilmediği durumda, Ulusal, Uluslararası veya AYER Kalibrasyon laboratuvarının kendi hazırladığı kalibrasyon metodu uygulanacaktır.</li>
+<li>Kalibrasyon faaliyeti için ulusal, uluslararası veya ilgili linkten ulaşılan kapsamda belirtilen standartlar kullanılır. İlgili link: https://secure.turkak.org.tr/pdf/AB0088K.pdf. Kalibrasyon öncesinde Müşteri tarafından Sertifika uygunluk değerlendirmesi yazılı olarak talep edildiği takdirde sertifika değerlendirmesi Karar Kuralı Prosedürüne göre gerçekleştirilir.</li>
+<li>Sözleşmede veya kalibrasyon metodunda herhangi bir değişiklik söz konusu olduğunda kalibrasyon işlemi durdurulur, müşteri bilgilendirilerek yazılı onay alınır.</li>
+<li>Laboratuvarımızda Müşteri gizliliğinin ve tarafsızlığının sağlanması esastır. Müşteri bilgileri üçüncü taraflarla, kanunen zorunlu olduğu veya sözleşmeden kaynaklı olarak yetkili kılındığı durumlar haricinde paylaşılmaz.</li>
+<li>Teklif onaylamadan cihazların AYER laboratuvarlarına gönderilmesi veya müşterinin kendi tesislerine kalibrasyon personelinin çağrılması durumunda, mail/fax v.b. gibi müşteri tarafından yapılan yazılı çağrılar, teklifin müşteri tarafından kabul edildiği anlamına gelir ve kalibrasyon işlemine başlanır.</li>
+<li>Teklifimizin Kabulü Halinde İmzalı, Firma Kaşeli onayınızı tarafımıza iletmenizi rica ederiz.</li>
+<li>AB-0088-K Nolu Türkak Markası Kullanım hakkı sadece Akredite olduğu konularda "Ayer Kalibrasyon ve Danışmanlık Dış Tic. Ltd. Şti." firmasına aittir.</li>
+</ol>
+
+<div style="margin-top:14px;">
+<h3 style="margin-top:0;">D - GİZLİLİK POLİTİKASI / CONFIDENTIALITY POLICY</h3>
+<ol>
+<li>Laboratuvar, kamuya açık hâle getirmek istediği bilgi hakkında müşteriyi önceden bilgilendirir. Diğer tüm bilgilerin özel bilgi olduğu değerlendirilir ve bu bilgiler mahrem bilgi kabul edilir. Bütün kayıtlar, emniyetli bir şekilde ve gizlilik içinde muhafaza edilmektedir.</li>
+<li>Laboratuvarın gizli bir bilgiyi açıklamaya kanunen zorunlu olduğu durumlarda, kanunen yasaklanmadıkça, müşteri ya da ilgili şahıs, açıklanacak bilgi konusunda haberdar edilir.</li>
+<li>Yasal olarak gereken haller dışında; yükleniciler, dış kuruluş personeli veya laboratuvar adına faaliyet gösteren şahıslar da dahil tüm çalışanlar, laboratuvarın faaliyetlerinin gerçekleştirilmesi sırasında elde edilen ya da oluşturulan tüm bilgileri gizli tutar.</li>
+</ol>
+</div>
+
+<div class="karar-kuralı">
+<strong>Karar Kuralı / Uygunluk Değerlendirmesi Talebi:</strong> &nbsp;&nbsp; ○ İstiyorum &nbsp;&nbsp; ○ İstemiyorum
+</div>
+
+<div class="signature-area">
+    <div class="sig-box">
+        <div class="sig-title">KALİBRASYON LABORATUVARI<br><small style="font-weight:normal;color:#64748b;">Teklifi Veren / Issued By</small></div>
+        <div style="font-size:9px;color:#475569;margin-bottom:4px;">${labAdi}</div>
+        <div style="font-size:9px;color:#475569;">Tarih / Date: ${tarih}</div>
+        <div class="sig-line">Adı Soyadı / Name &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; İmza / Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Kaşe / Stamp</div>
+    </div>
+    <div class="sig-box">
+        <div class="sig-title">MÜŞTERİ / CUSTOMER<br><small style="font-weight:normal;color:#64748b;">Onaylayan Yetkili / Authorized Signatory</small></div>
+        <div style="font-size:9px;color:#475569;margin-bottom:4px;">${t.firma_adi || ''}${t.sube_adi ? ' / ' + t.sube_adi : ''}</div>
+        <div style="font-size:9px;color:#475569;">Tarih / Date: _______________</div>
+        <div class="sig-line">Adı Soyadı / Name &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; İmza / Signature &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Kaşe / Stamp</div>
+    </div>
+</div>
+
+</div>
+</div>
+
+</body></html>`;
+
+        const blob = new Blob([html], { type: 'text/html; charset=utf-8' });
+        window.open(URL.createObjectURL(blob), '_blank');
     }
 
     function modalKapat() { document.getElementById("modal").classList.remove("open"); }
+
+    // ── DURUM DEĞİŞTİR ──
+    async function durumDegistir(id, yeniDurum, selectEl) {
+        const res = await fetch(`/api/teklifler/${id}/durum`, {
+            method: 'PATCH', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ durum: yeniDurum })
+        });
+        if (res.ok) {
+            const t = tumTeklifler.find(x => x.id === id);
+            if (t) t.durum = yeniDurum;
+            selectEl.className = `durum-select durum-sel-${yeniDurum}`;
+            showToast(`✅ Durum: ${yeniDurum}`);
+        } else showToast("❌ Durum güncellenemedi!", true);
+    }
+
+    // ── TEKLİF GÖNDER ──
+    let aktifMailTeklifId = null;
+    let mailListesi = [];
+
+    function teklifGonder(id) {
+        const t = tumTeklifler.find(x => x.id === id);
+        if (!t) return;
+        aktifMailTeklifId = id;
+        mailListesi = [];
+
+        // Müşterinin kayıtlı maillerini yükle
+        let kayitliMailler = [];
+        try { kayitliMailler = typeof t.sertifika_mailleri === 'string' ? JSON.parse(t.sertifika_mailleri) : (t.sertifika_mailleri || []); } catch(e) {}
+        kayitliMailler.forEach(m => {
+            const mail = typeof m === 'string' ? m : (m.email || m.adres || '');
+            if (mail) mailListesi.push(mail);
+        });
+
+        document.getElementById("mailTeklifBilgi").textContent = `${t.teklif_no} — ${t.firma_adi}${t.sube_adi ? ' / ' + t.sube_adi : ''}`;
+        document.getElementById("manuelMailInput").value = "";
+        document.getElementById("mailUyari").style.display = "none";
+        renderMailChipler();
+        document.getElementById("mailModal").style.display = "flex";
+    }
+
+    function renderMailChipler() {
+        const area = document.getElementById("mailChipArea");
+        if (!mailListesi.length) {
+            area.innerHTML = '<span style="font-size:0.8rem;color:#94a3b8;">Henüz mail eklenmedi</span>';
+            return;
+        }
+        area.innerHTML = mailListesi.map((m, i) => `
+            <span class="mail-chip">${m} <button onclick="mailSil(${i})">×</button></span>
+        `).join('');
+    }
+
+    function mailEkle() {
+        const input = document.getElementById("manuelMailInput");
+        const mail = input.value.trim();
+        if (!mail || !mail.includes('@')) { showToast("❌ Geçerli bir mail adresi girin!", true); return; }
+        if (mailListesi.includes(mail)) { showToast("⚠️ Bu adres zaten ekli!", true); return; }
+        mailListesi.push(mail);
+        input.value = "";
+        renderMailChipler();
+    }
+
+    function mailSil(i) {
+        mailListesi.splice(i, 1);
+        renderMailChipler();
+    }
+
+    async function mailGonder() {
+        if (!mailListesi.length) {
+            document.getElementById("mailUyari").textContent = "En az bir mail adresi ekleyin.";
+            document.getElementById("mailUyari").style.display = "block";
+            return;
+        }
+        const btn = document.getElementById("mailGonderBtn");
+        btn.disabled = true; btn.textContent = "Gönderiliyor...";
+        document.getElementById("mailUyari").style.display = "none";
+        const res = await fetch(`/api/teklifler/${aktifMailTeklifId}/gonder`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ mailler: mailListesi })
+        });
+        if (res.ok) {
+            showToast("✅ Teklif gönderildi!");
+            mailModalKapat();
+            listele();
+        } else {
+            const e = await res.json();
+            document.getElementById("mailUyari").textContent = e.error || "Gönderilemedi.";
+            document.getElementById("mailUyari").style.display = "block";
+        }
+        btn.disabled = false; btn.textContent = "📨 Teklifi Gönder";
+    }
+
+    function mailModalKapat() {
+        document.getElementById("mailModal").style.display = "none";
+        aktifMailTeklifId = null; mailListesi = [];
+    }
 
     // ── DÜZENLE ──
     function duzenle(id) {
@@ -497,7 +916,11 @@
         document.getElementById("gecerlilik").value = t.gecerlilik_gun||30;
         document.getElementById("teklif_notu").value = t.teklif_notu||'';
         document.getElementById("indirim").value = t.indirim_oran||0;
-        satirlar = Array.isArray(t.kalemler) ? t.kalemler : JSON.parse(t.kalemler||'[]');
+        const kd = typeof t.kalemler === 'object' && !Array.isArray(t.kalemler) ? t.kalemler : (Array.isArray(t.kalemler) ? {items:t.kalemler, yol_ucreti:0, konaklama_ucreti:0, kdv_oran:20} : JSON.parse(t.kalemler||'{}'));
+        satirlar = Array.isArray(kd) ? kd : (kd.items || []);
+        document.getElementById("yol_ucreti").value = kd.yol_ucreti || 0;
+        document.getElementById("konaklama_ucreti").value = kd.konaklama_ucreti || 0;
+        document.getElementById("kdv_oran").value = kd.kdv_oran != null ? kd.kdv_oran : 20;
         renderKalemler();
         document.getElementById("kaydetBtn").textContent = "💾 Güncelle";
         accordionAc();
@@ -524,6 +947,12 @@
         document.getElementById("cihaz_adi").value = "";
         document.getElementById("birim_fiyat").value = "";
         document.getElementById("adet").value = "1";
+        document.getElementById("ozellik_not").value = "";
+        document.getElementById("hizmet_sekli").value = "Müşteri Yerinde";
+        document.getElementById("kapsam_durumu").value = "Akredite";
+        document.getElementById("yol_ucreti").value = "0";
+        document.getElementById("konaklama_ucreti").value = "0";
+        document.getElementById("kdv_oran").value = "20";
         satirlar = []; renderKalemler();
         document.getElementById("kaydetBtn").textContent = "💾 Teklifi Kaydet";
         firmaCihazlari = [];
@@ -540,6 +969,14 @@
         ) : tumTeklifler;
         renderListe(data);
     }
+
+    function menuToggle(id, e) {
+        e.stopPropagation();
+        document.querySelectorAll('.act-wrap.open').forEach(m => { if(m.id !== 'am-'+id) m.classList.remove('open'); });
+        document.getElementById('am-'+id).classList.toggle('open');
+    }
+    function menuKapat() { document.querySelectorAll('.act-wrap.open').forEach(m => m.classList.remove('open')); }
+    document.addEventListener('click', menuKapat);
 
     window.onload = sayfaYukle;
 </script>

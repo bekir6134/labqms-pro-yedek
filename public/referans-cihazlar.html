@@ -58,6 +58,17 @@
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        /* DROPDOWN MENÜ */
+        .act-wrap { position:relative; display:inline-block; }
+        .act-btn { background:#f8fafc; border:1px solid var(--border); padding:5px 11px; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:600; color:var(--text); white-space:nowrap; }
+        .act-btn:hover { background:#e0e7ff; border-color:#a5b4fc; color:var(--primary); }
+        .act-drop { display:none; position:absolute; right:0; top:calc(100% + 4px); background:#fff; border:1px solid var(--border); border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,0.12); z-index:200; min-width:160px; overflow:hidden; }
+        .act-wrap.open .act-drop { display:block; }
+        .act-drop-item { padding:9px 15px; cursor:pointer; font-size:0.83rem; display:flex; align-items:center; gap:8px; color:var(--text); }
+        .act-drop-item:hover { background:#f1f5f9; }
+        .act-drop-item.danger { color:#dc2626; }
+        .act-drop-item.danger:hover { background:#fee2e2; }
+        .act-drop hr { margin:4px 0; border:none; border-top:1px solid var(--border); }
     </style>
 </head>
 <body>
@@ -169,10 +180,16 @@
                     <td>${r.envanter_no || '-'}</td>
                     <td>${r.olcme_araligi || '-'}</td>
                     <td>
-                        <button class="btn btn-kal" onclick="event.stopPropagation(); panelAc('KAL', ${r.id}, '${r.cihaz_adi}')">Kalibrasyon</button>
-                        <button class="btn btn-ara" onclick="event.stopPropagation(); panelAc('ARA', ${r.id}, '${r.cihaz_adi}')">Ara Kontrol</button>
-                        <button class="btn btn-sm" onclick="event.stopPropagation(); cihazDuzenle(${JSON.stringify(r).replace(/"/g, '&quot;')})" style="background:#e0e7ff;color:#4338ca;border:none;margin-left:3px;">✏️</button>
-                        <button class="btn btn-sm" onclick="event.stopPropagation(); cihazSil(${r.id})" style="background:#fee2e2;color:#dc2626;border:none;margin-left:3px;">🗑️</button>
+                        <div class="act-wrap" id="am-${r.id}">
+                            <button class="act-btn" onclick="event.stopPropagation();menuToggle(${r.id},event)">İşlemler ▾</button>
+                            <div class="act-drop">
+                                <div class="act-drop-item" onclick="event.stopPropagation();panelAc('KAL',${r.id},'${r.cihaz_adi}');menuKapat()">📅 Kalibrasyon</div>
+                                <div class="act-drop-item" onclick="event.stopPropagation();panelAc('ARA',${r.id},'${r.cihaz_adi}');menuKapat()">🔍 Ara Kontrol</div>
+                                <hr>
+                                <div class="act-drop-item" onclick="event.stopPropagation();cihazDuzenle(${JSON.stringify(r).replace(/"/g,'&quot;')});menuKapat()">✏️ Düzenle</div>
+                                <div class="act-drop-item danger" onclick="event.stopPropagation();cihazSil(${r.id});menuKapat()">🗑️ Sil</div>
+                            </div>
+                        </div>
                     </td>
                 </tr>
                 <tr id="tarihce-${r.id}" class="history-row">
@@ -375,6 +392,14 @@
             if (res.ok) { bildirimGoster("🗑️ Cihaz silindi!"); referansYukle(); }
             else bildirimGoster("❌ Silme başarısız!", true);
         }
+
+        function menuToggle(id, e) {
+            e.stopPropagation();
+            document.querySelectorAll('.act-wrap.open').forEach(m => { if(m.id !== 'am-'+id) m.classList.remove('open'); });
+            document.getElementById('am-'+id).classList.toggle('open');
+        }
+        function menuKapat() { document.querySelectorAll('.act-wrap.open').forEach(m => m.classList.remove('open')); }
+        document.addEventListener('click', menuKapat);
 
         window.onload = sayfaYukle;
     </script>

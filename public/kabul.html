@@ -109,6 +109,18 @@
         #toast.error { background:#ef4444; }
 
         .search-box input { padding:9px 9px 9px 34px; background:#fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%2364748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>') no-repeat 10px center; border:1px solid var(--border); border-radius:8px; width:240px; outline:none; font-size:0.84rem; }
+
+        /* DROPDOWN MENÜ */
+        .act-wrap { position:relative; display:inline-block; }
+        .act-btn { background:#f8fafc; border:1px solid var(--border); padding:5px 11px; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:600; color:var(--text); white-space:nowrap; }
+        .act-btn:hover { background:#e0e7ff; border-color:#a5b4fc; color:var(--primary); }
+        .act-drop { display:none; position:absolute; right:0; top:calc(100% + 4px); background:#fff; border:1px solid var(--border); border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,0.12); z-index:200; min-width:160px; overflow:hidden; }
+        .act-wrap.open .act-drop { display:block; }
+        .act-drop-item { padding:9px 15px; cursor:pointer; font-size:0.83rem; display:flex; align-items:center; gap:8px; color:var(--text); }
+        .act-drop-item:hover { background:#f1f5f9; }
+        .act-drop-item.danger { color:#dc2626; }
+        .act-drop-item.danger:hover { background:#fee2e2; }
+        .act-drop hr { margin:4px 0; border:none; border-top:1px solid var(--border); }
     </style>
 </head>
 <body>
@@ -196,10 +208,7 @@
                 </div>
                 <div>
                     <label>Kalibrasyon Yeri</label>
-                    <select id="h_kal_yeri">
-                        <option value="Laboratuvarda">Laboratuvarda</option>
-                        <option value="Yerinde">Yerinde</option>
-                    </select>
+                    <input type="text" id="h_kal_yeri" placeholder="Adres otomatik gelir...">
                 </div>
             </div>
             <div class="fg fg2">
@@ -213,9 +222,15 @@
                 </div>
             </div>
         </div>
-        <div class="hizli-foot">
-            <button onclick="hizliModalKapat()" style="background:#f1f5f9;color:#475569;border:none;padding:9px 18px;border-radius:8px;font-weight:600;cursor:pointer;">İptal</button>
-            <button onclick="hizliCihazKaydet()" style="background:var(--primary);color:white;border:none;padding:9px 20px;border-radius:8px;font-weight:700;cursor:pointer;" id="hizliKaydetBtn">⚡ Kaydet & Fişe Ekle</button>
+        <div class="hizli-foot" style="justify-content:space-between;">
+            <div style="display:flex;gap:8px;">
+                <button onclick="hizliKopyala()" style="background:#f0fdf4;color:#166534;border:1px solid #86efac;padding:9px 14px;border-radius:8px;font-weight:600;cursor:pointer;font-size:0.83rem;" title="Form bilgilerini kopyala">📋 Kopyala</button>
+                <button onclick="hizliYapistir()" id="hizliYapistirBtn" style="background:#eff6ff;color:#1e40af;border:1px solid #93c5fd;padding:9px 14px;border-radius:8px;font-weight:600;cursor:pointer;font-size:0.83rem;opacity:0.45;" title="Kopyalanan bilgileri yapıştır" disabled>📌 Yapıştır</button>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button onclick="hizliModalKapat()" style="background:#f1f5f9;color:#475569;border:none;padding:9px 18px;border-radius:8px;font-weight:600;cursor:pointer;">İptal</button>
+                <button onclick="hizliCihazKaydet()" style="background:var(--primary);color:white;border:none;padding:9px 20px;border-radius:8px;font-weight:700;cursor:pointer;" id="hizliKaydetBtn">⚡ Kaydet & Fişe Ekle</button>
+            </div>
         </div>
     </div>
 </div>
@@ -578,6 +593,74 @@
         btn.disabled=false; btn.textContent="🏢 Kaydet & Seç";
     }
 
+    // ── KOPYALA / YAPIŞTIR ──
+    let kopyalananHizli = null;
+
+    function hizliKopyala() {
+        kopyalananHizli = {
+            kategori_id:    document.getElementById("h_kategori_id").value,
+            cihaz_adi:      document.getElementById("h_cihaz_adi").value,
+            marka:          document.getElementById("h_marka").value,
+            model:          document.getElementById("h_model").value,
+            seri_no:        document.getElementById("h_seri_no").value,
+            envanter_no:    document.getElementById("h_envanter_no").value,
+            kal_yeri:       document.getElementById("h_kal_yeri").value,
+            olcum_araligi:  document.getElementById("h_olcum_araligi").value,
+            cozunurluk:     document.getElementById("h_cozunurluk").value
+        };
+        const btn = document.getElementById("hizliYapistirBtn");
+        btn.disabled = false; btn.style.opacity = "1";
+        showToast("📋 Form bilgileri kopyalandı!");
+    }
+
+    function hizliYapistir() {
+        if(!kopyalananHizli) return;
+        document.getElementById("h_kategori_id").value   = kopyalananHizli.kategori_id;
+        document.getElementById("h_cihaz_adi").value     = kopyalananHizli.cihaz_adi;
+        document.getElementById("h_marka").value         = kopyalananHizli.marka;
+        document.getElementById("h_model").value         = kopyalananHizli.model;
+        document.getElementById("h_seri_no").value       = kopyalananHizli.seri_no;
+        document.getElementById("h_envanter_no").value   = kopyalananHizli.envanter_no;
+        document.getElementById("h_kal_yeri").value      = kopyalananHizli.kal_yeri;
+        document.getElementById("h_olcum_araligi").value = kopyalananHizli.olcum_araligi;
+        document.getElementById("h_cozunurluk").value    = kopyalananHizli.cozunurluk;
+        showToast("📌 Bilgiler yapıştırıldı!");
+    }
+
+    // ── KOPYALA / YAPIŞTIR ──
+    let kopyalananHizli = null;
+
+    function hizliKopyala() {
+        kopyalananHizli = {
+            kategori_id:   document.getElementById("h_kategori_id").value,
+            cihaz_adi:     document.getElementById("h_cihaz_adi").value,
+            marka:         document.getElementById("h_marka").value,
+            model:         document.getElementById("h_model").value,
+            seri_no:       document.getElementById("h_seri_no").value,
+            envanter_no:   document.getElementById("h_envanter_no").value,
+            kal_yeri:      document.getElementById("h_kal_yeri").value,
+            olcum_araligi: document.getElementById("h_olcum_araligi").value,
+            cozunurluk:    document.getElementById("h_cozunurluk").value
+        };
+        const btn = document.getElementById("hizliYapistirBtn");
+        btn.disabled = false; btn.style.opacity = "1";
+        showToast("📋 Form bilgileri kopyalandı!");
+    }
+
+    function hizliYapistir() {
+        if(!kopyalananHizli) return;
+        document.getElementById("h_kategori_id").value   = kopyalananHizli.kategori_id;
+        document.getElementById("h_cihaz_adi").value     = kopyalananHizli.cihaz_adi;
+        document.getElementById("h_marka").value         = kopyalananHizli.marka;
+        document.getElementById("h_model").value         = kopyalananHizli.model;
+        document.getElementById("h_seri_no").value       = kopyalananHizli.seri_no;
+        document.getElementById("h_envanter_no").value   = kopyalananHizli.envanter_no;
+        document.getElementById("h_kal_yeri").value      = kopyalananHizli.kal_yeri;
+        document.getElementById("h_olcum_araligi").value = kopyalananHizli.olcum_araligi;
+        document.getElementById("h_cozunurluk").value    = kopyalananHizli.cozunurluk;
+        showToast("📌 Bilgiler yapıştırıldı!");
+    }
+
     // ── HIZLI CİHAZ EKLE ──
     function hizliModalAc() {
         const musteriId = document.getElementById("secili_musteri_id").value;
@@ -588,7 +671,7 @@
             tumKategoriler.map(k => `<option value="${k.id}">${k.kategori_adi}</option>`).join('');
         // Formu temizle
         ['h_cihaz_adi','h_marka','h_model','h_seri_no','h_envanter_no','h_olcum_araligi','h_cozunurluk'].forEach(id => document.getElementById(id).value = '');
-        document.getElementById("h_kal_yeri").value = 'Laboratuvarda';
+        document.getElementById("h_kal_yeri").value = ayarlarData.adres || '';
         document.getElementById("hizliModal").classList.add("open");
     }
 
@@ -721,8 +804,15 @@
                 <td><span style="background:#eff6ff;color:var(--primary);padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">${cihazlar.length} cihaz</span></td>
                 <td><span class="asama-badge asama-${asama}">${ASAMA_LABEL[asama]||asama}</span></td>
                 <td>
-                    <button class="btn-edit" onclick="duzenle(${r.id})">✏️ Düzenle</button>
-                    <button class="btn-del"  onclick="sil(${r.id})">🗑️ Sil</button>
+                    <div class="act-wrap" id="am-${r.id}">
+                        <button class="act-btn" onclick="menuToggle(${r.id},event)">İşlemler ▾</button>
+                        <div class="act-drop">
+                            <div class="act-drop-item" onclick="pdfOnizle(${r.id});menuKapat()">📄 PDF Önizle</div>
+                            <hr>
+                            <div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>
+                            <div class="act-drop-item danger" onclick="sil(${r.id});menuKapat()">🗑️ Sil</div>
+                        </div>
+                    </div>
                 </td>
             </tr>`;
         }).join('');
@@ -803,14 +893,16 @@
         ) : tumKayitlar);
     }
 
-    let personeller = [], teklifler = [];
+    let personeller = [], teklifler = [], ayarlarData = {};
 
     async function yukle() {
-        const [ieRes, katRes] = await Promise.all([
+        const [ieRes, katRes, ayarlarRes] = await Promise.all([
             fetch("/api/is-emirleri-on-veriler"),
-            fetch("/api/kategoriler")
+            fetch("/api/kategoriler"),
+            fetch("/api/ayarlar")
         ]);
         const d = await ieRes.json();
+        try { ayarlarData = await ayarlarRes.json(); } catch(e) {}
         musteriler    = d.musteriler||[];
         personeller   = d.personeller||[];
         teklifler     = d.teklifler||[];
@@ -835,6 +927,151 @@
         const filtered = musteriId ? teklifler.filter(t=>t.musteri_id==musteriId) : teklifler;
         sel.innerHTML = '<option value="">— Teklif seçin —</option>' +
             filtered.map(t=>`<option value="${t.id}">${t.teklif_no}</option>`).join('');
+    }
+
+    // ── DROPDOWN MENÜ ──
+    function menuToggle(id, e) {
+        e.stopPropagation();
+        document.querySelectorAll('.act-wrap.open').forEach(m => { if(m.id !== 'am-'+id) m.classList.remove('open'); });
+        document.getElementById('am-'+id).classList.toggle('open');
+    }
+    function menuKapat() {
+        document.querySelectorAll('.act-wrap.open').forEach(m => m.classList.remove('open'));
+    }
+    document.addEventListener('click', menuKapat);
+
+    // ── PDF ÖNİZLE ──
+    function pdfOnizle(id) {
+        const r = tumKayitlar.find(x => x.id === id);
+        if(!r) return;
+        const cihazlar = Array.isArray(r.cihazlar) ? r.cihazlar : JSON.parse(r.cihazlar||'[]');
+        const kabul  = r.kabul_tarihi  ? new Date(r.kabul_tarihi).toLocaleDateString('tr-TR')  : '-';
+        const teslim = r.teslim_tarihi ? new Date(r.teslim_tarihi).toLocaleDateString('tr-TR') : '-';
+
+        const labLogo    = ayarlarData.lab_logo    || '';
+        const turkakLogo = ayarlarData.turkak_logo || '';
+        const labAdi     = ayarlarData.lab_adi     || 'Kalibrasyon Laboratuvarı';
+        const labAdres   = ayarlarData.adres        || '';
+
+        const logoSol   = labLogo    ? `<img src="${labLogo}" style="height:60px;max-width:140px;object-fit:contain;">` : `<div style="font-size:1.3rem;font-weight:800;color:#1e40af;">${labAdi}</div>`;
+        const logoSag   = turkakLogo ? `<img src="${turkakLogo}" style="height:60px;max-width:140px;object-fit:contain;">` : '';
+
+        const cihazSatirlari = cihazlar.map((c, i) => `
+            <tr>
+                <td style="text-align:center;">${i+1}</td>
+                <td>${c.cihaz_adi||'-'}</td>
+                <td>${c.marka_model||'-'}</td>
+                <td style="font-family:monospace;font-size:0.85em;">${c.seri_no||'-'}</td>
+                <td style="font-family:monospace;font-size:0.85em;">${c.envanter_no||'-'}</td>
+                <td>${c.kategori_adi||'-'}</td>
+                <td>${c.aksesuar||'-'}</td>
+            </tr>`).join('');
+
+        const html = `<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Cihaz Kabul Fişi - ${r.ie_no}</title>
+<style>
+  @media print { body{margin:0;} .no-print{display:none!important;} }
+  body { font-family: Arial, sans-serif; color: #1a1a1a; padding: 24px; font-size: 13px; }
+  .header { display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid #1e40af; padding-bottom:14px; margin-bottom:20px; }
+  .header-center { text-align:center; flex:1; }
+  .header-center .doc-title { font-size:1.2rem; font-weight:800; color:#1e40af; }
+  .header-center .doc-sub   { font-size:0.78rem; color:#475569; margin-top:4px; }
+  .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px; }
+  .info-box { border:1px solid #e2e8f0; border-radius:8px; padding:12px 16px; background:#f8fafc; }
+  .info-box h4 { margin:0 0 8px; font-size:0.78rem; color:#64748b; text-transform:uppercase; letter-spacing:0.4px; border-bottom:1px solid #e2e8f0; padding-bottom:4px; }
+  .info-row { display:flex; gap:6px; margin-bottom:4px; font-size:0.86rem; }
+  .info-label { color:#64748b; min-width:120px; font-weight:600; }
+  table { width:100%; border-collapse:collapse; margin-bottom:20px; font-size:0.83rem; }
+  thead th { background:#1e40af; color:#fff; padding:9px 10px; text-align:left; }
+  tbody td { padding:8px 10px; border-bottom:1px solid #e2e8f0; vertical-align:middle; }
+  tbody tr:nth-child(even) td { background:#f8fafc; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:8px; font-size:0.75rem; font-weight:700; background:#dbeafe; color:#1e40af; }
+  .sign-area { display:grid; grid-template-columns:1fr 1fr; gap:40px; margin-top:40px; }
+  .sign-box { border-top:2px solid #334155; padding-top:12px; text-align:center; }
+  .sign-label { font-weight:700; font-size:0.85rem; color:#334155; }
+  .sign-sub   { font-size:0.76rem; color:#64748b; margin-top:4px; }
+  .notes-box { border:1px solid #e2e8f0; border-radius:8px; padding:12px 16px; background:#fffbeb; margin-bottom:20px; }
+  .notes-box h4 { margin:0 0 6px; font-size:0.78rem; color:#92400e; }
+  .print-bar { background:#1e40af; color:#fff; padding:10px 18px; border-radius:8px; display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; font-weight:600; font-size:0.88rem; }
+  .print-bar button { background:#fff; color:#1e40af; border:none; padding:6px 16px; border-radius:6px; font-weight:700; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="print-bar no-print">
+  <span>📄 PDF kaydetmek için: Yazdır → Hedef: PDF olarak kaydet</span>
+  <button onclick="window.print()">🖨️ Yazdır / PDF Kaydet</button>
+</div>
+
+<div class="header">
+  <div>${logoSol}</div>
+  <div class="header-center">
+    <div class="doc-title">CİHAZ KABUL FİŞİ</div>
+    <div class="doc-sub">DEVICE ACCEPTANCE FORM</div>
+    <div style="margin-top:6px;font-size:0.82rem;font-weight:700;color:#334155;">${labAdi}</div>
+    ${labAdres ? `<div style="font-size:0.74rem;color:#64748b;">${labAdres}</div>` : ''}
+  </div>
+  <div>${logoSag}</div>
+</div>
+
+<div class="info-grid">
+  <div class="info-box">
+    <h4>Fiş Bilgileri</h4>
+    <div class="info-row"><span class="info-label">Fiş No (IE):</span><strong>${r.ie_no||'-'}</strong></div>
+    <div class="info-row"><span class="info-label">Kabul Tarihi:</span>${kabul}</div>
+    <div class="info-row"><span class="info-label">Teslim Tarihi:</span>${teslim}</div>
+    ${r.teklif_no ? `<div class="info-row"><span class="info-label">Teklif No:</span>${r.teklif_no}</div>` : ''}
+  </div>
+  <div class="info-box">
+    <h4>Firma Bilgileri</h4>
+    <div class="info-row"><span class="info-label">Firma:</span><strong>${r.firma_adi||'-'}${r.sube_adi?' / '+r.sube_adi:''}</strong></div>
+    <div class="info-row"><span class="info-label">Teslim Eden:</span>${r.teslim_eden||'-'}</div>
+    <div class="info-row"><span class="info-label">Teslim Alan:</span>${r.teslim_alan_adi||'-'}</div>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:36px;">#</th>
+      <th>Cihaz Adı</th>
+      <th>Marka / Model</th>
+      <th>Seri No</th>
+      <th>Envanter No</th>
+      <th>Kategori</th>
+      <th>Aksesuar / Not</th>
+    </tr>
+  </thead>
+  <tbody>${cihazSatirlari}</tbody>
+</table>
+
+${r.notlar ? `<div class="notes-box"><h4>📝 Notlar / Açıklamalar</h4>${r.notlar}</div>` : ''}
+
+<div style="font-size:0.78rem;color:#94a3b8;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:16px;">
+  Bu kabul fişi, yukarıda belirtilen cihazların teslim alındığını teyit eder. Cihazlar kalibrasyon işlemleri tamamlandıktan sonra iade edilecektir.
+</div>
+
+<div class="sign-area">
+  <div class="sign-box">
+    <div class="sign-label">Teslim Alan / Received By</div>
+    <div style="margin:30px 0 8px;font-size:0.8rem;color:#94a3b8;">Ad Soyad & İmza</div>
+    <div class="sign-sub">${r.teslim_alan_adi||'...........................'} &nbsp; Tarih: ${kabul}</div>
+  </div>
+  <div class="sign-box">
+    <div class="sign-label">Teslim Eden / Delivered By</div>
+    <div style="margin:30px 0 8px;font-size:0.8rem;color:#94a3b8;">Ad Soyad & İmza</div>
+    <div class="sign-sub">${r.teslim_eden||'...........................'} &nbsp; Tarih: ${kabul}</div>
+  </div>
+</div>
+
+</body></html>`;
+
+        const blob = new Blob([html], {type:'text/html'});
+        const url  = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
     }
 
     window.onload = yukle;

@@ -44,6 +44,10 @@
         .kanban-card .firma { color:#475569; font-size:0.76rem; margin-top:2px; }
         .kanban-card .meta { color:#94a3b8; font-size:0.72rem; margin-top:3px; }
         .kanban-empty { color:#94a3b8; font-size:0.75rem; text-align:center; padding:10px; }
+        .kanban-col.aktif { transform:translateY(-3px); box-shadow:0 6px 20px rgba(30,64,175,0.22); border:2px solid var(--primary); }
+        .kanban-col.aktif .kanban-head { font-weight:800; }
+        .kanban-col.aktif .kanban-count { background:rgba(255,255,255,0.35); font-weight:800; font-size:0.8rem; }
+        .kanban-col { transition:transform 0.15s, box-shadow 0.15s; }
 
         /* KART */
         .card { background:#fff; border-radius:12px; border:1px solid var(--border); box-shadow:0 2px 6px rgba(0,0,0,0.04); margin-bottom:16px; }
@@ -128,7 +132,7 @@
         /* DETAY MODAL */
         #modal { display:none; position:fixed; z-index:2000; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; }
         #modal.open { display:flex; }
-        .modal-box { background:#fff; border-radius:14px; width:90%; max-width:600px; max-height:85vh; overflow-y:auto; padding:26px; position:relative; }
+        .modal-box { background:#fff; border-radius:14px; width:92%; max-width:900px; max-height:90vh; overflow-y:auto; padding:26px; position:relative; }
         .modal-close { position:absolute; right:16px; top:16px; font-size:1.2rem; cursor:pointer; color:#64748b; border:none; background:none; }
 
         /* TOAST */
@@ -179,6 +183,18 @@
         #toast { visibility:hidden; min-width:260px; background-color:var(--success); color:#fff; text-align:center; border-radius:8px; padding:14px; position:fixed; z-index:9999; right:24px; top:24px; font-weight:600; box-shadow:0 4px 12px rgba(0,0,0,0.15); }
         #toast.show { visibility:visible; }
         #toast.error { background-color:#ef4444; }
+
+        /* DROPDOWN MENÜ */
+        .act-wrap { position:relative; display:inline-block; }
+        .act-btn { background:#f8fafc; border:1px solid var(--border); padding:5px 11px; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:600; color:var(--text); white-space:nowrap; }
+        .act-btn:hover { background:#e0e7ff; border-color:#a5b4fc; color:var(--primary); }
+        .act-drop { display:none; position:fixed; background:#fff; border:1px solid var(--border); border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,0.15); z-index:9000; min-width:170px; overflow:hidden; }
+        .act-drop.open { display:block; }
+        .act-drop-item { padding:9px 15px; cursor:pointer; font-size:0.83rem; display:flex; align-items:center; gap:8px; color:var(--text); }
+        .act-drop-item:hover { background:#f1f5f9; }
+        .act-drop-item.danger { color:#dc2626; }
+        .act-drop-item.danger:hover { background:#fee2e2; }
+        .act-drop hr { margin:4px 0; border:none; border-top:1px solid var(--border); }
     </style>
 </head>
 <body>
@@ -509,6 +525,9 @@
         </div>
     </div>
 
+    <!-- DURUM KANBAN -->
+    <div class="kanban" id="sertKanban" style="margin-bottom:12px;"></div>
+
     <!-- TOPLU İŞLEM BARI -->
     <div class="toplu-bar" id="topluBar">
         <div class="secili-info" id="topluBilgi">0 sertifika seçildi</div>
@@ -565,6 +584,11 @@
         'onaylandı':'Onaylandı', sertifika_gönderildi:'Sertifika Gönderildi'
     };
     const IE_ASAMALAR = ['kabul_edildi','hazırlanıyor','tamamlandı','imzalandı','onaylandı','sertifika_gönderildi'];
+    const SERT_ASAMALAR = ['hazırlanıyor','imzalandı','onaylandı','sertifika_gönderildi'];
+    const SERT_ASAMA_LABEL = {
+        'hazırlanıyor':'Hazırlanıyor', 'imzalandı':'İmzalandı',
+        'onaylandı':'Onaylandı', 'sertifika_gönderildi':'Sertifika Gönderildi'
+    };
 
     let tumIsEmirleri = [], filtreliIE = [];
     let tumSertifikalar = [], filtreliSert = [];
@@ -640,27 +664,47 @@
         ieFiltrele();
     }
 
+    function ieKanbanFiltrele(asama) {
+        const sel = document.getElementById("ie_filtre_asama");
+        sel.value = (sel.value === asama) ? '' : asama;
+        ieFiltrele();
+        document.querySelector('#panel-is-emirleri .card').scrollIntoView({behavior:'smooth', block:'start'});
+    }
+
+    function renderSertKanban() {
+        const el = document.getElementById("sertKanban");
+        if(!el) return;
+        const asamaFiltre = document.getElementById("s_filtre_asama").value;
+        el.innerHTML = SERT_ASAMALAR.map(asama => {
+            const sayi = tumSertifikalar.filter(s => (s.asama||'hazırlanıyor') === asama).length;
+            const aktif = asamaFiltre === asama;
+            return `<div class="kanban-col${aktif?' aktif':''}" onclick="sertKanbanFiltrele('${asama}')" style="cursor:pointer;">
+                <div class="kanban-head kh-${asama}" style="text-align:center;${aktif?'padding:11px 12px;':''}" title="Bu durumu filtrele">
+                    ${aktif?'✔ ':''}${SERT_ASAMA_LABEL[asama]} <span class="kanban-count">${sayi}</span>
+                </div>
+                ${aktif?'<div style="height:3px;background:var(--primary);"></div>':''}
+            </div>`;
+        }).join('');
+    }
+
+    function sertKanbanFiltrele(asama) {
+        const sel = document.getElementById("s_filtre_asama");
+        sel.value = (sel.value === asama) ? '' : asama;
+        sertFiltrele();
+        document.querySelector('#panel-sertifikalar .card').scrollIntoView({behavior:'smooth', block:'start'});
+    }
+
     function renderIEKanban(data) {
         const kanban = document.getElementById("ieKanban");
+        const asamaFiltre = document.getElementById("ie_filtre_asama").value;
         kanban.innerHTML = IE_ASAMALAR.map(asama => {
-            const kartlar = data.filter(r=>(r.asama||'kabul_edildi')===asama);
-            return `<div class="kanban-col">
-                <div class="kanban-head kh-${asama}">
-                    ${IE_ASAMA_LABEL[asama]} <span class="kanban-count">${kartlar.length}</span>
+            const kartlar = tumIsEmirleri.filter(r=>(r.asama||'kabul_edildi')===asama);
+            const aktif = asamaFiltre === asama;
+            return `<div class="kanban-col${aktif?' aktif':''}" style="cursor:pointer;">
+                <div class="kanban-head kh-${asama}" onclick="ieKanbanFiltrele('${asama}')" style="${aktif?'padding:11px 12px;':''}" title="Bu aşamayı filtrele">
+                    ${aktif?'✔ ':''}${IE_ASAMA_LABEL[asama]} <span class="kanban-count">${kartlar.length}</span>
                 </div>
-                <div class="kanban-cards">
-                    ${kartlar.length===0 ? '<div class="kanban-empty">Boş</div>' :
-                    kartlar.map(r => {
-                        let cihazlar = [];
-            try { cihazlar = Array.isArray(r.cihazlar)?r.cihazlar:JSON.parse(r.cihazlar||'[]'); } catch(e) { cihazlar=[]; }
-                        return `<div class="kanban-card" onclick="ieDetay(${r.id})">
-                            <div class="ie">${r.ie_no}</div>
-                            <div class="firma">${r.firma_adi}</div>
-                            <div class="meta">📦 ${cihazlar.length} cihaz</div>
-                            ${r.teslim_tarihi?`<div class="meta">📅 ${new Date(r.teslim_tarihi).toLocaleDateString('tr-TR')}</div>`:''}
-                        </div>`;
-                    }).join('')}
-                </div>
+                ${aktif?'<div style="height:3px;background:var(--primary);"></div>':''}
             </div>`;
         }).join('');
     }
@@ -717,26 +761,11 @@
                 }
 
                 return `<div class="cihaz-satir">
-                    <div>
-                        <div class="col-label">Cihaz Adı</div>
-                        <div class="cihaz-ad">${c.cihaz_adi||'—'}</div>
-                    </div>
-                    <div>
-                        <div class="col-label">Marka</div>
-                        <div class="cihaz-marka">${marka||'—'}</div>
-                    </div>
-                    <div>
-                        <div class="col-label">Model</div>
-                        <div class="cihaz-model">${model||'—'}</div>
-                    </div>
-                    <div>
-                        <div class="col-label">Seri No</div>
-                        <div class="cihaz-seri">${c.seri_no||'—'}</div>
-                    </div>
-                    <div>
-                        <div class="col-label">Envanter No</div>
-                        <div class="cihaz-envanter">${c.envanter_no||'—'}</div>
-                    </div>
+                    <div><div class="cihaz-ad">${c.cihaz_adi||'—'}</div></div>
+                    <div><div class="cihaz-marka">${marka||'—'}</div></div>
+                    <div><div class="cihaz-model">${model||'—'}</div></div>
+                    <div><div class="cihaz-seri">${c.seri_no||'—'}</div></div>
+                    <div><div class="cihaz-envanter">${c.envanter_no||'—'}</div></div>
                     <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
                         ${btn}
                         ${tedarikci ? '<span style="font-size:0.71rem;color:#94a3b8;font-weight:600;">📦 Tedarikçi</span>' : ''}
@@ -762,8 +791,13 @@
                         </select>
                     </div>
                     <div style="display:flex;gap:6px;align-items:center;">
-                        <button class="btn btn-detail" onclick="event.stopPropagation();ieDetay(${r.id})">👁️</button>
-                        <button class="btn btn-mail" style="font-size:0.72rem;padding:5px 8px;" onclick="event.stopPropagation();ieFisMailGonder(${r.id})" title="Bu fişe ait tüm sertifikaları mail gönder">📧 Mail</button>
+                        <div class="act-wrap" id="am-ie-${r.id}">
+                            <button class="act-btn" onclick="event.stopPropagation();menuToggle('ie-${r.id}',event)">İşlemler ▾</button>
+                            <div class="act-drop">
+                                <div class="act-drop-item" onclick="event.stopPropagation();ieDetay(${r.id});menuKapat()">👁️ Detayları Görüntüle</div>
+                                <div class="act-drop-item" onclick="event.stopPropagation();ieFisMailGonder(${r.id});menuKapat()">📧 Sertifikaları Mail Gönder</div>
+                            </div>
+                        </div>
                         <span class="ie-acc-arrow" id="arrow-${r.id}">▼</span>
                     </div>
                 </div>
@@ -1096,6 +1130,7 @@
 
 
 
+        renderSertKanban();
         sertFiltrele();
         // İş emri aşamalarını sertifika aşamalarına göre güncelle
         await ieSertAsamaSync();
@@ -1146,6 +1181,7 @@
                 return sertSiralaYon === 'asc' ? va.localeCompare(vb,'tr') : vb.localeCompare(va,'tr');
             });
         }
+        renderSertKanban();
         renderSertListe(filtreliSert);
         secimGuncelle();
     }
@@ -1165,29 +1201,27 @@
             const tarih = s.kal_tarihi?new Date(s.kal_tarihi).toLocaleDateString('tr-TR'):'-';
             const pdfVar = s.olcum_pdf_var;
 
-            // Aşamaya göre butonlar
-            let butonlar = `<button class="btn btn-duzenle" onclick="sertDuzenle(${s.id})">✏️ Düzenle</button>`;
-            // Ölçüm PDF
-            if(!pdfVar) {
-                butonlar += `<button class="btn btn-pdf-yukle" onclick="olcumPdfYukle(${s.id})">📎 Ölçüm PDF</button>`;
-            } else {
-                butonlar += `<button class="btn btn-pdf-yukle" onclick="olcumPdfYukle(${s.id})" title="Değiştir">📎 Ölçüm PDF ✓</button>`;
-            }
-            // Tam sertifika önizle
-            butonlar += `<button class="btn btn-onizle" onclick="tamOnizle(${s.id})">👁️ Önizle</button>`;
+            // Ölçüm PDF (dropdown dışında kalır)
+            const olcumPdfBtn = !pdfVar
+                ? `<button class="btn btn-pdf-yukle" onclick="olcumPdfYukle(${s.id})">📎 Ölçüm PDF</button>`
+                : `<button class="btn btn-pdf-yukle" onclick="olcumPdfYukle(${s.id})" title="Değiştir">📎 Ölçüm PDF ✓</button>`;
 
-            // Aşamaya göre aksiyon butonları
+            // Dropdown içindeki aşamaya göre öğeler
+            let dropItems = `<div class="act-drop-item" onclick="tamOnizle(${s.id});menuKapat()">👁️ Sertifika Önizle</div>`;
+            dropItems += `<div class="act-drop-item" onclick="sertDuzenle(${s.id});menuKapat()">✏️ Düzenle</div>`;
             if(asama==='hazırlanıyor' && pdfVar) {
-                butonlar += `<button class="btn btn-imzala" onclick="tekliImzala(${s.id})">✍️ İmzala</button>`;
+                dropItems += `<div class="act-drop-item" onclick="tekliImzala(${s.id});menuKapat()">✍️ İmzala</div>`;
             }
             if(asama==='imzalandı') {
-                butonlar += `<button class="btn btn-onayla" onclick="tekliOnayla(${s.id})">✅ Onayla</button>`;
+                dropItems += `<div class="act-drop-item" onclick="tekliOnayla(${s.id});menuKapat()">✅ Onayla</div>`;
             }
             if(asama==='onaylandı' || asama==='sertifika_gönderildi') {
-                butonlar += `<button class="btn btn-mail" onclick="tekliMail(${s.id})">📧 Mail</button>`;
+                dropItems += `<div class="act-drop-item" onclick="tekliMail(${s.id});menuKapat()">📧 Sertifika Mail Gönder</div>`;
             }
-            butonlar += `<button class="btn btn-uygun" onclick="uygunsuzlukForm(${s.id})">⚠️ Uygunsuzluk</button>`;
-            butonlar += `<button class="btn" style="background:#fff1f2;color:#be123c;font-size:0.72rem;" onclick="icerikTemizle(${s.id})" title="Sertifikayı siler, iş emrinde tekrar oluşturulabilir">🗑️ Temizle</button>`;
+            dropItems += `<hr><div class="act-drop-item" onclick="uygunsuzlukForm(${s.id});menuKapat()">⚠️ Uygunsuzluk</div>`;
+            dropItems += `<div class="act-drop-item danger" onclick="icerikTemizle(${s.id});menuKapat()" title="Sertifikayı siler">🗑️ Temizle</div>`;
+
+            const butonlar = `${olcumPdfBtn}<div class="act-wrap" id="am-${s.id}"><button class="act-btn" onclick="menuToggle(${s.id},event)">İşlemler ▾</button><div class="act-drop">${dropItems}</div></div>`;
 
             return `<tr data-sert-id="${s.id}">
                 <td><input type="checkbox" class="sert-sec" data-id="${s.id}" onchange="secimGuncelle()"></td>
@@ -1907,6 +1941,29 @@
         } catch(e) {}
         await ieYukle();
     }
+
+    function menuToggle(id, e) {
+        e.stopPropagation();
+        document.querySelectorAll('.act-drop.open').forEach(d => d.classList.remove('open'));
+        const wrap = document.getElementById('am-'+id);
+        if(!wrap) return;
+        const drop = wrap.querySelector('.act-drop');
+        if(drop.classList.contains('open')) { drop.classList.remove('open'); return; }
+        const btn = wrap.querySelector('.act-btn');
+        const rect = btn.getBoundingClientRect();
+        const dropWidth = 200;
+        let left = rect.right - dropWidth;
+        if(left < 4) left = 4;
+        let top = rect.bottom + 4;
+        if(top + 280 > window.innerHeight) top = rect.top - 280;
+        drop.style.left = left + 'px';
+        drop.style.top  = top  + 'px';
+        drop.style.width = dropWidth + 'px';
+        drop.classList.add('open');
+    }
+    function menuKapat() { document.querySelectorAll('.act-drop.open').forEach(d => d.classList.remove('open')); }
+    document.addEventListener('click', menuKapat);
+    document.addEventListener('scroll', menuKapat, true);
 
     window.onload = init;
 </script>

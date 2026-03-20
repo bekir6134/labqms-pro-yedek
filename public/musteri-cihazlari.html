@@ -61,6 +61,17 @@
         #toast { visibility: hidden; min-width: 260px; background-color: var(--success); color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 9999; right: 30px; top: 30px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: 0.3s; }
         #toast.show { visibility: visible; }
         #toast.error { background-color: #ef4444; }
+        /* DROPDOWN MENÜ */
+        .act-wrap { position:relative; display:inline-block; }
+        .act-btn { background:#f8fafc; border:1px solid var(--border); padding:5px 11px; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:600; color:var(--text); white-space:nowrap; }
+        .act-btn:hover { background:#e0e7ff; border-color:#a5b4fc; color:var(--primary); }
+        .act-drop { display:none; position:absolute; right:0; top:calc(100% + 4px); background:#fff; border:1px solid var(--border); border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,0.12); z-index:200; min-width:160px; overflow:hidden; }
+        .act-wrap.open .act-drop { display:block; }
+        .act-drop-item { padding:9px 15px; cursor:pointer; font-size:0.83rem; display:flex; align-items:center; gap:8px; color:var(--text); }
+        .act-drop-item:hover { background:#f1f5f9; }
+        .act-drop-item.danger { color:#dc2626; }
+        .act-drop-item.danger:hover { background:#fee2e2; }
+        .act-drop hr { margin:4px 0; border:none; border-top:1px solid var(--border); }
 
         /* ZORUNLU İŞARET */
         .req { color: #ef4444; }
@@ -198,6 +209,7 @@
 <script>
     let tumCihazlar = [];
     let kutuphaneCihazlar = [];
+    let labAdres = '';
 
     // ── ACCORDION ──
     function toggleAccordion() {
@@ -250,8 +262,15 @@
 
     // ── SAYFA YÜKLEMESİ ──
     async function sayfaYukle() {
-        const res = await fetch('/api/musteri-cihazlari-on-veriler');
+        const [res, ayarlarRes] = await Promise.all([
+            fetch('/api/musteri-cihazlari-on-veriler'),
+            fetch('/api/ayarlar')
+        ]);
         const data = await res.json();
+        const ayarlar = await ayarlarRes.json();
+
+        labAdres = ayarlar.adres || '';
+        document.getElementById("kalibrasyon_yeri").value = labAdres;
 
         // Müşteri select
         const mSel = document.getElementById("musteri_id");
@@ -300,8 +319,13 @@
                 <td>${c.metot_kodu ? `<span class="badge badge-green">${c.metot_kodu}</span>` : '-'}</td>
                 <td style="max-width:140px; font-size:0.8rem;">${c.kalibrasyon_yeri || '-'}</td>
                 <td>
-                    <button class="btn-edit" onclick="duzenle(${c.id})">✏️ Düzenle</button>
-                    <button class="btn-del" onclick="sil(${c.id})">🗑️ Sil</button>
+                    <div class="act-wrap" id="am-${c.id}">
+                        <button class="act-btn" onclick="menuToggle(${c.id},event)">İşlemler ▾</button>
+                        <div class="act-drop">
+                            <div class="act-drop-item" onclick="duzenle(${c.id});menuKapat()">✏️ Düzenle</div>
+                            <div class="act-drop-item danger" onclick="sil(${c.id});menuKapat()">🗑️ Sil</div>
+                        </div>
+                    </div>
                 </td>
             </tr>
         `).join('');
@@ -386,10 +410,11 @@
     function formTemizle() {
         ["duzenle_id","musteri_id","kategori_id","cihaz_adi","marka","model",
          "seri_no","envanter_no","olcum_araligi","cozunurluk","metot_id",
-         "degerlendirme_kriteri","kalibrasyon_yeri"].forEach(id => {
+         "degerlendirme_kriteri"].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.value = "";
         });
+        document.getElementById("kalibrasyon_yeri").value = labAdres;
         document.getElementById("saveBtn").innerText = "🚀 Cihazı Kaydet";
     }
 
@@ -406,6 +431,14 @@
         );
         renderTablo(data);
     }
+
+    function menuToggle(id, e) {
+        e.stopPropagation();
+        document.querySelectorAll('.act-wrap.open').forEach(m => { if(m.id !== 'am-'+id) m.classList.remove('open'); });
+        document.getElementById('am-'+id).classList.toggle('open');
+    }
+    function menuKapat() { document.querySelectorAll('.act-wrap.open').forEach(m => m.classList.remove('open')); }
+    document.addEventListener('click', menuKapat);
 
     window.onload = sayfaYukle;
 </script>
