@@ -1263,6 +1263,17 @@
         const bar = document.getElementById("topluBar");
         document.getElementById("topluBilgi").textContent = `${secilen.length} sertifika seçildi`;
         secilen.length > 0 ? bar.classList.add("show") : bar.classList.remove("show");
+
+        // Aşamaya göre buton görünürlüğü
+        const asama = document.getElementById("s_filtre_asama")?.value || "";
+        const hazir = asama === "hazırlanıyor";
+        const imzali = asama === "imzalandı";
+        const onayliSec = asama === "onaylandı";
+        document.getElementById("btnTopluKDNo").style.display   = hazir ? "" : "none";
+        document.getElementById("btnTopluAkrNo").style.display  = hazir ? "" : "none";
+        document.getElementById("btnTopluImzala").style.display = hazir ? "" : "none";
+        document.getElementById("btnTopluOnayla").style.display = imzali ? "" : "none";
+        document.getElementById("btnTopluMail").style.display   = onayliSec ? "" : "none";
     }
 
     function secilenIdler() {

@@ -110,6 +110,15 @@
 
         .search-box input { padding:9px 9px 9px 34px; background:#fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%2364748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>') no-repeat 10px center; border:1px solid var(--border); border-radius:8px; width:240px; outline:none; font-size:0.84rem; }
 
+        /* KANBAN */
+        .kabul-kanban { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+        .kabul-kol { flex:1; min-width:120px; border:2px solid var(--border); border-radius:10px; padding:10px 14px; cursor:pointer; text-align:center; background:#fff; transition:0.18s; user-select:none; }
+        .kabul-kol:hover { border-color:#93c5fd; background:#f0f9ff; }
+        .kabul-kol.aktif { border-color:var(--primary); background:#eff6ff; transform:translateY(-3px); box-shadow:0 4px 14px rgba(30,64,175,0.15); position:relative; }
+        .kabul-kol.aktif::after { content:''; position:absolute; bottom:-2px; left:0; right:0; height:3px; background:var(--primary); border-radius:0 0 8px 8px; }
+        .kabul-kol-sayi { font-size:1.5rem; font-weight:800; color:var(--primary); }
+        .kabul-kol-label { font-size:0.72rem; font-weight:700; color:#64748b; margin-top:2px; }
+
         /* DROPDOWN MENÜ */
         .act-wrap { position:relative; display:inline-block; }
         .act-btn { background:#f8fafc; border:1px solid var(--border); padding:5px 11px; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:600; color:var(--text); white-space:nowrap; }
@@ -121,10 +130,33 @@
         .act-drop-item.danger { color:#dc2626; }
         .act-drop-item.danger:hover { background:#fee2e2; }
         .act-drop hr { margin:4px 0; border:none; border-top:1px solid var(--border); }
+        /* ONAY MODAL */
+        #onayModal { display:none; position:fixed; z-index:9999; inset:0; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; }
+        #onayModal.open { display:flex; }
+        .onay-box { background:#fff; border-radius:14px; padding:28px 32px; max-width:380px; width:90%; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+        .onay-ikon { font-size:2.2rem; margin-bottom:10px; }
+        .onay-baslik { font-weight:700; font-size:1.05rem; color:#1e293b; margin-bottom:8px; }
+        .onay-mesaj { font-size:0.87rem; color:#64748b; margin-bottom:22px; }
+        .onay-butonlar { display:flex; gap:10px; justify-content:center; }
+        .onay-evet { background:var(--primary); color:#fff; border:none; padding:10px 24px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.9rem; }
+        .onay-hayir { background:#f1f5f9; color:#475569; border:none; padding:10px 24px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.9rem; }
     </style>
 </head>
 <body>
 <div id="toast"></div>
+
+<!-- ONAY MODAL -->
+<div id="onayModal">
+    <div class="onay-box">
+        <div class="onay-ikon" id="onayIkon">❓</div>
+        <div class="onay-baslik" id="onayBaslik"></div>
+        <div class="onay-mesaj" id="onayMesaj"></div>
+        <div class="onay-butonlar">
+            <button class="onay-hayir" id="onayHayirBtn" onclick="onayKapat()">İptal</button>
+            <button class="onay-evet" id="onayEvetBtn">Evet, Devam Et</button>
+        </div>
+    </div>
+</div>
 
 <!-- HIZLI FİRMA EKLE MODAL -->
 <div id="hizliFirmaModal">
@@ -172,11 +204,12 @@
 <div id="hizliModal">
     <div class="hizli-box">
         <div class="hizli-head">
-            <div class="hizli-title">⚡ Hızlı Cihaz Kaydı</div>
+            <div class="hizli-title" id="hizliModalBaslik">⚡ Hızlı Cihaz Kaydı</div>
             <button class="hizli-close" onclick="hizliModalKapat()">✕</button>
         </div>
         <div class="hizli-body">
-            <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;padding:9px 13px;font-size:0.82rem;color:#92400e;margin-bottom:16px;">
+            <input type="hidden" id="h_duzenle_idx">
+            <div id="hizliModalBilgi" style="background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;padding:9px 13px;font-size:0.82rem;color:#92400e;margin-bottom:16px;">
                 ⚡ Kayıt sonrası cihaz otomatik olarak kabul fişine eklenecektir.
             </div>
             <div class="fg fg2">
@@ -230,6 +263,7 @@
             <div style="display:flex;gap:8px;">
                 <button onclick="hizliModalKapat()" style="background:#f1f5f9;color:#475569;border:none;padding:9px 18px;border-radius:8px;font-weight:600;cursor:pointer;">İptal</button>
                 <button onclick="hizliCihazKaydet()" style="background:var(--primary);color:white;border:none;padding:9px 20px;border-radius:8px;font-weight:700;cursor:pointer;" id="hizliKaydetBtn">⚡ Kaydet & Fişe Ekle</button>
+                <button id="hizliGuncelleBtn" onclick="hizliCihazGuncelle()" style="display:none;background:#4338ca;color:white;border:none;padding:9px 20px;border-radius:8px;font-weight:700;cursor:pointer;">💾 Güncelle</button>
             </div>
         </div>
     </div>
@@ -339,7 +373,10 @@
             <input type="text" id="araInput" onkeyup="ara()" placeholder="IE no, firma ara...">
         </div>
     </div>
-    <div style="padding:18px;">
+    <div style="padding:16px 18px 0;">
+        <div class="kabul-kanban" id="kabulKanban"></div>
+    </div>
+    <div style="padding:0 18px 18px;">
         <table>
             <thead>
                 <tr>
@@ -368,6 +405,7 @@
 
     let musteriler = [], tumCihazlar = [], filtreliCihazlar = [];
     let tumKayitlar = [], tumKategoriler = [];
+    let aktifAsamaFiltre = "";
     let secilenCihazlar = []; // { musteri_cihaz_id, cihaz_adi, marka, model, seri_no, envanter_no, kategori_adi, durum, aksesuar }
 
     function showToast(msg, err=false) {
@@ -376,20 +414,53 @@
         setTimeout(() => t.className = "", 3200);
     }
 
+    // ── DEĞİŞİKLİK TAKİBİ ──
+    let formDegisti = false;
+    function formDegistiIsaretle() { formDegisti = true; }
+
+    // ── ONAY MODAL ──
+    let onayCallback = null;
+    function onayGoster(ikon, baslik, mesaj, evetYazi, cb) {
+        document.getElementById("onayIkon").textContent = ikon;
+        document.getElementById("onayBaslik").textContent = baslik;
+        document.getElementById("onayMesaj").textContent = mesaj;
+        document.getElementById("onayEvetBtn").textContent = evetYazi;
+        onayCallback = cb;
+        document.getElementById("onayEvetBtn").onclick = () => { onayKapat(); cb(); };
+        document.getElementById("onayModal").classList.add("open");
+    }
+    function onayKapat() {
+        document.getElementById("onayModal").classList.remove("open");
+        onayCallback = null;
+    }
+
     // ── ACCORDION ──
     function toggleAcc() {
         const c = document.getElementById("accContent");
-        const h = document.querySelector(".accordion-header");
-        const i = document.getElementById("accIcon");
         const acik = c.style.display === "block";
-        c.style.display = acik ? "none" : "block";
-        h.classList.toggle("active", !acik);
-        i.innerText = acik ? "▼" : "▲";
+        if(acik && formDegisti) {
+            onayGoster("⚠️", "Kaydedilmemiş değişiklikler var",
+                "Formu kapatırsanız yaptığınız değişiklikler kaybolacak. Devam etmek istiyor musunuz?",
+                "Evet, Kapat", () => { formDegisti = false; _accKapat(); });
+            return;
+        }
+        acik ? _accKapat() : _accAc();
     }
-    function accAc() {
-        document.getElementById("accContent").style.display = "block";
+    function _accAc() {
+        const c = document.getElementById("accContent");
+        c.style.display = "block";
         document.querySelector(".accordion-header").classList.add("active");
         document.getElementById("accIcon").innerText = "▲";
+    }
+    function _accKapat() {
+        const c = document.getElementById("accContent");
+        c.style.display = "none";
+        document.querySelector(".accordion-header").classList.remove("active");
+        document.getElementById("accIcon").innerText = "▼";
+    }
+    function accAc() {
+        _accAc();
+        formDegisti = false;
     }
 
     // ── FİRMA ARAMA ──
@@ -428,6 +499,7 @@
     }
 
     async function firmaSec(id, ad) {
+        formDegistiIsaretle();
         document.getElementById("secili_musteri_id").value = id;
         document.getElementById("firmaAramaInput").value = "";
         document.getElementById("firmaSonuclar").style.display = "none";
@@ -494,6 +566,7 @@
     }
 
     function cihazToggle(id) {
+        formDegistiIsaretle();
         const c = tumCihazlar.find(x => x.id == id);
         if(!c) return;
         const idx = secilenCihazlar.findIndex(s => s.musteri_cihaz_id == id);
@@ -502,14 +575,17 @@
         } else {
             secilenCihazlar.push({
                 musteri_cihaz_id: c.id,
-                cihaz_adi:  c.cihaz_adi,
-                marka:      c.marka||'',
-                model:      c.model||'',
-                seri_no:    c.seri_no||'',
-                envanter_no:c.envanter_no||'',
-                kategori_adi: c.kategori_adi||'',
-                durum:      'Sağlam',
-                aksesuar:   ''
+                cihaz_adi:       c.cihaz_adi,
+                marka:           c.marka||'',
+                model:           c.model||'',
+                seri_no:         c.seri_no||'',
+                envanter_no:     c.envanter_no||'',
+                kategori_adi:    c.kategori_adi||'',
+                kalibrasyon_yeri:c.kalibrasyon_yeri||'',
+                olcum_araligi:   c.olcum_araligi||'',
+                cozunurluk:      c.cozunurluk||'',
+                durum:           'Sağlam',
+                aksesuar:        ''
             });
         }
         renderCihazGrid(filtreliCihazlar);
@@ -538,7 +614,10 @@
                 </select>
             </td>
             <td><input type="text" placeholder="Kablo, kutu..." value="${c.aksesuar}" onchange="secilenGuncelle(${i},'aksesuar',this.value)" style="min-width:130px;"></td>
-            <td><button class="btn-del-row" onclick="cihazKaldir(${i})">✕</button></td>
+            <td style="white-space:nowrap;">
+                <button class="btn-edit" onclick="hizliDuzenleAc(${i})" style="margin-right:4px;" title="Düzenle">✏️</button>
+                <button class="btn-del-row" onclick="cihazKaldir(${i})" title="Kaldır">✕</button>
+            </td>
         </tr>`).join('');
     }
 
@@ -627,40 +706,6 @@
         showToast("📌 Bilgiler yapıştırıldı!");
     }
 
-    // ── KOPYALA / YAPIŞTIR ──
-    let kopyalananHizli = null;
-
-    function hizliKopyala() {
-        kopyalananHizli = {
-            kategori_id:   document.getElementById("h_kategori_id").value,
-            cihaz_adi:     document.getElementById("h_cihaz_adi").value,
-            marka:         document.getElementById("h_marka").value,
-            model:         document.getElementById("h_model").value,
-            seri_no:       document.getElementById("h_seri_no").value,
-            envanter_no:   document.getElementById("h_envanter_no").value,
-            kal_yeri:      document.getElementById("h_kal_yeri").value,
-            olcum_araligi: document.getElementById("h_olcum_araligi").value,
-            cozunurluk:    document.getElementById("h_cozunurluk").value
-        };
-        const btn = document.getElementById("hizliYapistirBtn");
-        btn.disabled = false; btn.style.opacity = "1";
-        showToast("📋 Form bilgileri kopyalandı!");
-    }
-
-    function hizliYapistir() {
-        if(!kopyalananHizli) return;
-        document.getElementById("h_kategori_id").value   = kopyalananHizli.kategori_id;
-        document.getElementById("h_cihaz_adi").value     = kopyalananHizli.cihaz_adi;
-        document.getElementById("h_marka").value         = kopyalananHizli.marka;
-        document.getElementById("h_model").value         = kopyalananHizli.model;
-        document.getElementById("h_seri_no").value       = kopyalananHizli.seri_no;
-        document.getElementById("h_envanter_no").value   = kopyalananHizli.envanter_no;
-        document.getElementById("h_kal_yeri").value      = kopyalananHizli.kal_yeri;
-        document.getElementById("h_olcum_araligi").value = kopyalananHizli.olcum_araligi;
-        document.getElementById("h_cozunurluk").value    = kopyalananHizli.cozunurluk;
-        showToast("📌 Bilgiler yapıştırıldı!");
-    }
-
     // ── HIZLI CİHAZ EKLE ──
     function hizliModalAc() {
         const musteriId = document.getElementById("secili_musteri_id").value;
@@ -672,7 +717,78 @@
         // Formu temizle
         ['h_cihaz_adi','h_marka','h_model','h_seri_no','h_envanter_no','h_olcum_araligi','h_cozunurluk'].forEach(id => document.getElementById(id).value = '');
         document.getElementById("h_kal_yeri").value = ayarlarData.adres || '';
+        document.getElementById("h_duzenle_idx").value = '';
+        document.getElementById("hizliModalBaslik").textContent = '⚡ Hızlı Cihaz Kaydı';
+        document.getElementById("hizliModalBilgi").style.display = '';
+        document.getElementById("hizliKaydetBtn").style.display = '';
+        document.getElementById("hizliGuncelleBtn").style.display = 'none';
         document.getElementById("hizliModal").classList.add("open");
+    }
+
+    function hizliDuzenleAc(idx) {
+        const c = secilenCihazlar[idx];
+        if(!c) return;
+        // Kategori selecti doldur
+        const sel = document.getElementById("h_kategori_id");
+        sel.innerHTML = '<option value="">— Seçin —</option>' +
+            tumKategoriler.map(k => `<option value="${k.id}">${k.kategori_adi}</option>`).join('');
+        // Formu doldur
+        document.getElementById("h_cihaz_adi").value    = c.cihaz_adi || '';
+        document.getElementById("h_marka").value         = c.marka || '';
+        document.getElementById("h_model").value         = c.model || '';
+        document.getElementById("h_seri_no").value       = c.seri_no || '';
+        document.getElementById("h_envanter_no").value   = c.envanter_no || '';
+        document.getElementById("h_kal_yeri").value      = c.kalibrasyon_yeri || '';
+        document.getElementById("h_olcum_araligi").value = c.olcum_araligi || '';
+        document.getElementById("h_cozunurluk").value    = c.cozunurluk || '';
+        const kat = tumKategoriler.find(k => k.kategori_adi === c.kategori_adi);
+        if(kat) document.getElementById("h_kategori_id").value = kat.id;
+        document.getElementById("h_duzenle_idx").value = idx;
+        document.getElementById("hizliModalBaslik").textContent = '✏️ Cihazı Düzenle';
+        document.getElementById("hizliModalBilgi").style.display = 'none';
+        document.getElementById("hizliKaydetBtn").style.display = 'none';
+        document.getElementById("hizliGuncelleBtn").style.display = '';
+        document.getElementById("hizliModal").classList.add("open");
+    }
+
+    async function hizliCihazGuncelle() {
+        const idx = parseInt(document.getElementById("h_duzenle_idx").value);
+        const c = secilenCihazlar[idx];
+        if(!c) return;
+        const cihazAdi  = document.getElementById("h_cihaz_adi").value.trim();
+        const kategoriId = document.getElementById("h_kategori_id").value;
+        if(!cihazAdi) return showToast("❌ Cihaz adı gerekli!", true);
+
+        const btn = document.getElementById("hizliGuncelleBtn");
+        btn.disabled = true; btn.textContent = "Güncelleniyor...";
+
+        const payload = {
+            cihaz_adi:      cihazAdi,
+            marka:          document.getElementById("h_marka").value.trim(),
+            model:          document.getElementById("h_model").value.trim(),
+            seri_no:        document.getElementById("h_seri_no").value.trim(),
+            envanter_no:    document.getElementById("h_envanter_no").value.trim(),
+            kalibrasyon_yeri: document.getElementById("h_kal_yeri").value,
+            olcum_araligi:  document.getElementById("h_olcum_araligi").value.trim(),
+            cozunurluk:     document.getElementById("h_cozunurluk").value.trim(),
+            musteri_id:     document.getElementById("secili_musteri_id").value,
+            kategori_id:    kategoriId || null
+        };
+
+        try {
+            if(c.musteri_cihaz_id) {
+                const res = await fetch(`/api/musteri-cihazlari/${c.musteri_cihaz_id}`, {
+                    method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)
+                });
+                if(!res.ok) throw new Error();
+            }
+            const kat = tumKategoriler.find(k => k.id == kategoriId);
+            secilenCihazlar[idx] = { ...c, ...payload, kategori_adi: kat?.kategori_adi || c.kategori_adi };
+            renderSecilenler();
+            hizliModalKapat();
+            showToast(`✅ "${cihazAdi}" güncellendi!`);
+        } catch(e) { showToast("❌ Güncelleme başarısız!", true); }
+        btn.disabled = false; btn.textContent = "💾 Güncelle";
     }
 
     function hizliModalKapat() {
@@ -706,6 +822,7 @@
             const res = await fetch("/api/musteri-cihazlari", {
                 method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)
             });
+            if(res.status === 409) { const err = await res.json(); return showToast("⚠️ " + err.error, true); }
             if(!res.ok) throw new Error();
             const yeni = await res.json();
 
@@ -718,19 +835,25 @@
             filtreliCihazlar = [...tumCihazlar];
             secilenCihazlar.push({
                 musteri_cihaz_id: yeni.id,
-                cihaz_adi:   yeni.cihaz_adi,
-                marka:       yeni.marka||'',
-                model:       yeni.model||'',
-                seri_no:     yeni.seri_no||'',
-                envanter_no: yeni.envanter_no||'',
-                kategori_adi: yeni.kategori_adi,
-                durum:       'Sağlam',
-                aksesuar:    ''
+                cihaz_adi:       yeni.cihaz_adi,
+                marka:           yeni.marka||'',
+                model:           yeni.model||'',
+                seri_no:         yeni.seri_no||'',
+                envanter_no:     yeni.envanter_no||'',
+                kategori_adi:    yeni.kategori_adi,
+                kalibrasyon_yeri:yeni.kalibrasyon_yeri||'',
+                olcum_araligi:   yeni.olcum_araligi||'',
+                cozunurluk:      yeni.cozunurluk||'',
+                durum:           'Sağlam',
+                aksesuar:        ''
             });
 
             renderCihazGrid(filtreliCihazlar);
             renderSecilenler();
-            hizliModalKapat();
+            // Formu temizle, modal açık kalsın
+            ['h_cihaz_adi','h_marka','h_model','h_seri_no','h_envanter_no','h_olcum_araligi','h_cozunurluk'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('h_kategori_id').value = '';
+            document.getElementById('h_kal_yeri').value = ayarlarData.adres || '';
             showToast(`✅ "${yeni.cihaz_adi}" kaydedildi ve fişe eklendi!`);
         } catch(e) {
             showToast("❌ Kayıt başarısız!", true);
@@ -745,17 +868,31 @@
         if(!musteriId)       return showToast("❌ Firma seçin!", true);
         if(!kabulTarihi)     return showToast("❌ Kabul tarihi girin!", true);
         if(!secilenCihazlar.length) return showToast("❌ En az bir cihaz seçin!", true);
-
-        const duzenleId = document.getElementById("duzenle_id").value;
+        const duzenleIdOnay = document.getElementById("duzenle_id").value;
+        const onayBaslikMetni = duzenleIdOnay ? "Fişi güncellemek istiyor musunuz?" : "Kabul fişini kaydetmek istiyor musunuz?";
+        const onayEvetMetni   = duzenleIdOnay ? "✅ Güncelle" : "✅ Kaydet";
+        onayGoster("💾", onayBaslikMetni,
+            `${secilenCihazlar.length} cihaz içeren fiş ${duzenleIdOnay ? "güncellenecek" : "oluşturulacak"}.`,
+            onayEvetMetni, _kaydetOnayli);
+    }
+    async function _kaydetOnayli() {
+        const musteriId   = document.getElementById("secili_musteri_id").value;
+        const kabulTarihi = document.getElementById("kabul_tarihi").value;
+        const duzenleId   = document.getElementById("duzenle_id").value;
         const cihazlar = secilenCihazlar.map(c => ({
             musteri_cihaz_id: c.musteri_cihaz_id,
-            cihaz_adi:   c.cihaz_adi,
-            marka_model: [c.marka, c.model].filter(Boolean).join(" / "),
-            seri_no:     c.seri_no,
-            envanter_no: c.envanter_no,
-            kategori_adi: c.kategori_adi,
-            durum:       c.durum,
-            aksesuar:    c.aksesuar
+            cihaz_adi:        c.cihaz_adi,
+            marka_model:      [c.marka, c.model].filter(Boolean).join(" / "),
+            marka:            c.marka,
+            model:            c.model,
+            seri_no:          c.seri_no,
+            envanter_no:      c.envanter_no,
+            kategori_adi:     c.kategori_adi,
+            kalibrasyon_yeri: c.kalibrasyon_yeri,
+            olcum_araligi:    c.olcum_araligi,
+            cozunurluk:       c.cozunurluk,
+            durum:            c.durum,
+            aksesuar:         c.aksesuar
         }));
 
         const payload = {
@@ -775,16 +912,47 @@
         const url    = duzenleId ? `/api/is-emirleri/${duzenleId}` : "/api/is-emirleri";
         const method = duzenleId ? "PUT" : "POST";
         const res = await fetch(url, { method, headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload) });
-        if(res.ok) { showToast(duzenleId ? "✅ Güncellendi!" : "✅ Kabul fişi oluşturuldu!"); formTemizle(); listele(); }
+        if(res.ok) { formDegisti = false; showToast(duzenleId ? "✅ Güncellendi!" : "✅ Kabul fişi oluşturuldu!"); formTemizle(); listele(); }
         else showToast("❌ Kayıt başarısız!", true);
         btn.disabled = false; btn.textContent = "💾 Kabul Fişini Kaydet";
+    }
+
+    // ── KANBAN ──
+    const KABUL_ASAMALAR = ['kabul_edildi','hazırlanıyor','tamamlandı','imzalandı','onaylandı','sertifika_gönderildi'];
+    const KABUL_ASAMA_IKON = { kabul_edildi:'📥', 'hazırlanıyor':'🔧', 'tamamlandı':'✔️', imzalandı:'✍️', 'onaylandı':'✅', sertifika_gönderildi:'📧' };
+
+    function renderKanban() {
+        const wrap = document.getElementById("kabulKanban");
+        wrap.innerHTML = KABUL_ASAMALAR.map(a => {
+            const sayi = tumKayitlar.filter(r => (r.asama||'kabul_edildi') === a).length;
+            const aktif = aktifAsamaFiltre === a;
+            return `<div class="kabul-kol${aktif?' aktif':''}" onclick="kanbanFiltrele('${a}')">
+                <div class="kabul-kol-sayi">${aktif?'✔ ':''}${sayi}</div>
+                <div class="kabul-kol-label">${KABUL_ASAMA_IKON[a]} ${ASAMA_LABEL[a]||a}</div>
+            </div>`;
+        }).join('');
+    }
+
+    function kanbanFiltrele(asama) {
+        aktifAsamaFiltre = aktifAsamaFiltre === asama ? "" : asama;
+        renderKanban();
+        uygulaFiltre();
+    }
+
+    function uygulaFiltre() {
+        let data = tumKayitlar;
+        if(aktifAsamaFiltre) data = data.filter(r => (r.asama||'kabul_edildi') === aktifAsamaFiltre);
+        const f = document.getElementById("araInput").value.toUpperCase();
+        if(f) data = data.filter(r => (r.ie_no||"").toUpperCase().includes(f) || (r.firma_adi||"").toUpperCase().includes(f));
+        renderListe(data);
     }
 
     // ── LİSTE ──
     async function listele() {
         const res = await fetch("/api/is-emirleri");
         tumKayitlar = await res.json();
-        renderListe(tumKayitlar);
+        renderKanban();
+        uygulaFiltre();
     }
 
     function renderListe(data) {
@@ -840,14 +1008,17 @@
         const cihazlar = Array.isArray(r.cihazlar)?r.cihazlar:JSON.parse(r.cihazlar||"[]");
         secilenCihazlar = cihazlar.map(c => ({
             musteri_cihaz_id: c.musteri_cihaz_id||null,
-            cihaz_adi:   c.cihaz_adi,
-            marka:       c.marka||(c.marka_model||'').split('/')[0].trim(),
-            model:       c.model||(c.marka_model||'').split('/')[1]?.trim()||'',
-            seri_no:     c.seri_no||'',
-            envanter_no: c.envanter_no||'',
-            kategori_adi:c.kategori_adi||'',
-            durum:       c.durum||'Sağlam',
-            aksesuar:    c.aksesuar||''
+            cihaz_adi:        c.cihaz_adi,
+            marka:            c.marka||(c.marka_model||'').split('/')[0].trim(),
+            model:            c.model||(c.marka_model||'').split('/')[1]?.trim()||'',
+            seri_no:          c.seri_no||'',
+            envanter_no:      c.envanter_no||'',
+            kategori_adi:     c.kategori_adi||'',
+            kalibrasyon_yeri: c.kalibrasyon_yeri||'',
+            olcum_araligi:    c.olcum_araligi||'',
+            cozunurluk:       c.cozunurluk||'',
+            durum:            c.durum||'Sağlam',
+            aksesuar:         c.aksesuar||''
         }));
         renderCihazGrid(filtreliCihazlar);
         renderSecilenler();
@@ -869,6 +1040,7 @@
     }
 
     function formTemizle() {
+        formDegisti = false;
         document.getElementById("duzenle_id").value = "";
         firmaSifirla();
         document.getElementById("kabul_tarihi").valueAsDate = new Date();
@@ -886,12 +1058,7 @@
         document.getElementById("kaydetBtn").textContent = "💾 Kabul Fişini Kaydet";
     }
 
-    function ara() {
-        const f = document.getElementById("araInput").value.toUpperCase();
-        renderListe(f ? tumKayitlar.filter(r =>
-            (r.ie_no||"").toUpperCase().includes(f) || (r.firma_adi||"").toUpperCase().includes(f)
-        ) : tumKayitlar);
-    }
+    function ara() { uygulaFiltre(); }
 
     let personeller = [], teklifler = [], ayarlarData = {};
 
@@ -920,6 +1087,11 @@
         document.getElementById("kabul_tarihi").valueAsDate = new Date();
         firmaAramaKur();
         listele();
+        // Form değişiklik takibi
+        ['kabul_tarihi','teslim_tarihi','notlar','teslim_eden','teslim_alan_id','teklif_id'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.addEventListener('change', formDegistiIsaretle);
+        });
     }
 
     function teklifleriDoldur(musteriId) {

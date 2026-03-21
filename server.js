@@ -883,6 +883,22 @@ app.get('/api/musteri-cihazlari', async (req, res) => {
 app.post('/api/musteri-cihazlari', async (req, res) => {
     try {
         const { musteri_id, kategori_id, cihaz_adi, marka, model, seri_no, envanter_no, olcum_araligi, cozunurluk, metot_id, degerlendirme_kriteri, kalibrasyon_yeri } = req.body;
+        // Mükerrer kayıt kontrolü
+        if (seri_no) {
+            const dup = await pool.query(
+                'SELECT id FROM musteri_cihazlari WHERE musteri_id=$1 AND cihaz_adi=$2 AND seri_no=$3',
+                [musteri_id, cihaz_adi, seri_no]
+            );
+            if (dup.rows.length > 0)
+                return res.status(409).json({ error: `Bu firmaya ait "${cihaz_adi}" cihazından aynı seri numarasıyla (${seri_no}) kayıt zaten mevcut!` });
+        } else if (envanter_no) {
+            const dup = await pool.query(
+                'SELECT id FROM musteri_cihazlari WHERE musteri_id=$1 AND cihaz_adi=$2 AND envanter_no=$3',
+                [musteri_id, cihaz_adi, envanter_no]
+            );
+            if (dup.rows.length > 0)
+                return res.status(409).json({ error: `Bu firmaya ait "${cihaz_adi}" cihazından aynı envanter numarasıyla (${envanter_no}) kayıt zaten mevcut!` });
+        }
         const result = await pool.query(
             `INSERT INTO musteri_cihazlari (musteri_id, kategori_id, cihaz_adi, marka, model, seri_no, envanter_no, olcum_araligi, cozunurluk, metot_id, degerlendirme_kriteri, kalibrasyon_yeri)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
