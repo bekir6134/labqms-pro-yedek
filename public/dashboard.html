@@ -85,9 +85,11 @@
         .bildirim-item { font-size:0.83rem; color:#334155; padding:3px 0; border-bottom:1px dashed rgba(0,0,0,0.08); }
         .bildirim-item:last-child { border-bottom:none; }
 
-        #toast { visibility:hidden; min-width:240px; background:#10B981; color:#fff; text-align:center; border-radius:8px; padding:14px; position:fixed; z-index:9999; right:24px; top:24px; font-weight:600; box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+        #toast { visibility:hidden; min-width:240px; background:#10B981; color:#fff; text-align:center; border-radius:8px; padding:14px; position:fixed; z-index:9999; right:24px; top:24px; font-weight:600; box-shadow:0 4px 12px rgba(0,0,0,0.15); transition:opacity 0.3s; }
         #toast.show { visibility:visible; }
         #toast.error { background:#ef4444; }
+        #toast.warn { background:#d97706; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
     </style>
 </head>
 <body>
@@ -178,8 +180,9 @@
 
     <!-- YAKLAŞAN AKTİVİTELER -->
     <div class="card">
-        <div class="card-head">
+        <div class="card-head" style="display:flex;align-items:center;justify-content:space-between;">
             <div class="card-title">⚠️ Yaklaşan Aktiviteler (30 Gün)</div>
+            <span id="yaklasanRozet" style="display:none;background:#ef4444;color:#fff;border-radius:12px;padding:2px 9px;font-size:0.72rem;font-weight:700;animation:pulse 1.5s infinite;"></span>
         </div>
         <div class="card-body" id="yaklasanListesi">
             <div style="color:#94a3b8;font-size:0.85rem;text-align:center;padding:10px;">Yükleniyor...</div>
@@ -282,7 +285,7 @@
         // Referans cihaz: 30 gün veya geçmiş
         aktiviteler.forEach(r => {
             const gun = parseInt(r.kalan_gun);
-            const tip = r.islem_tipi === 'KALİBRASYON' ? '🔬 Kalibrasyon' : '🔍 Ara Kontrol';
+            const tip = r.islem_tipi?.toUpperCase().includes('KAL') ? '🔬 Kalibrasyon' : '🔍 Ara Kontrol';
             const tarih = new Date(r.sonraki_kal_tarihi).toLocaleDateString('tr-TR');
             if (gun < 0) {
                 items.push({ kritik: true, text: `${tip} VADESİ GEÇTİ! → ${r.cihaz_adi} (S/N: ${r.seri_no}) — ${tarih}` });
@@ -319,13 +322,46 @@
 
     function renderYaklasan(liste) {
         const el = document.getElementById("yaklasanListesi");
-        if (!liste.length) { el.innerHTML='<div style="color:#94a3b8;font-size:0.85rem;text-align:center;padding:10px;">Yaklaşan aktivite yok 🎉</div>'; return; }
+        const rozet = document.getElementById("yaklasanRozet");
+
+        if (!liste.length) {
+            el.innerHTML = '<div style="color:#94a3b8;font-size:0.85rem;text-align:center;padding:10px;">Yaklaşan aktivite yok 🎉</div>';
+            rozet.style.display = 'none';
+            return;
+        }
+
+        const gecmis = liste.filter(r => parseInt(r.kalan_gun) < 0).length;
+        const yaklasan = liste.filter(r => parseInt(r.kalan_gun) >= 0).length;
+
+        // Rozet
+        rozet.style.display = 'inline-block';
+        if (gecmis > 0) {
+            rozet.textContent = `${gecmis} vadesi geçti!`;
+            rozet.style.background = '#dc2626';
+        } else {
+            rozet.textContent = `${yaklasan} yaklaşıyor`;
+            rozet.style.background = '#d97706';
+        }
+
+        // Toast bildirimi (sadece bir kez)
+        if (!window._yaklasanToastGosterildi) {
+            window._yaklasanToastGosterildi = true;
+            if (gecmis > 0) {
+                showToast(`🔴 ${gecmis} referans cihazın kalibrasyonu vadesi geçti!`, true);
+            } else if (yaklasan > 0) {
+                const t = document.getElementById("toast");
+                t.textContent = `⚠️ ${yaklasan} referans cihazın kalibrasyonu 30 gün içinde!`;
+                t.className = 'show warn';
+                setTimeout(() => t.className = '', 5000);
+            }
+        }
+
         el.innerHTML = liste.map(r => {
             const gun = parseInt(r.kalan_gun);
             const tarih = new Date(r.sonraki_kal_tarihi).toLocaleDateString('tr-TR');
             let cls = gun < 0 ? 'gun-red' : gun <= 7 ? 'gun-red' : gun <= 15 ? 'gun-orange' : gun <= 30 ? 'gun-yellow' : 'gun-green';
             const gunText = gun < 0 ? `${Math.abs(gun)} gün geçti!` : gun === 0 ? 'Bugün!' : `${gun} gün kaldı`;
-            const tip = r.islem_tipi === 'KALİBRASYON' ? '🔬' : '🔍';
+            const tip = r.islem_tipi?.toUpperCase().includes('KAL') ? '🔬' : '🔍';
             return `<div class="yakl-item">
                 <span style="font-size:1.1rem;">${tip}</span>
                 <div style="flex:1;min-width:0;">

@@ -1401,6 +1401,20 @@
         }
     }
 
+    // EronSign sonucunu bekle — status değişene kadar her 5s'de sertYukle
+    function eronSignPoll(idler, beklenenAsama, maxDeneme = 12) {
+        let deneme = 0;
+        const interval = setInterval(async () => {
+            deneme++;
+            await sertYukle();
+            const hepsiGecti = idler.every(id => tumSertifikalar.find(s=>s.id===id)?.asama === beklenenAsama);
+            if(hepsiGecti || deneme >= maxDeneme) {
+                clearInterval(interval);
+                if(hepsiGecti) showToast(`✅ ${idler.length} sertifika → ${beklenenAsama}`);
+            }
+        }, 5000);
+    }
+
     // ── TOPLU İŞLEMLER ──
     async function topluImzala() {
         const idler = secilenIdler();
@@ -1426,8 +1440,10 @@
                 method:'POST', headers:{'Content-Type':'application/json'},
                 body: JSON.stringify(dosyalar)
             });
-            if(res.ok) showToast(`✅ ${idler.length} PDF imzalama kuyruğuna alındı.`);
-            else showToast("❌ EronSign'a gönderilemedi!", true);
+            if(res.ok) {
+                showToast(`⏳ ${idler.length} PDF imzalanıyor, otomatik güncellenecek...`);
+                eronSignPoll(idler, 'imzalandı');
+            } else showToast("❌ EronSign'a gönderilemedi!", true);
         } catch(e) {
             showToast('❌ EronSign servisine ulaşılamadı (localhost:5600).', true);
         }
@@ -1436,8 +1452,32 @@
     async function topluOnayla() {
         const idler = secilenIdler();
         if(!idler.length) return showToast("❌ Sertifika seçin!", true);
-        showToast(`✅ ${idler.length} sertifika onaylanıyor...`);
-        await sertAsamaGuncelle(idler, 'onaylandı');
+
+        const imzalilar = idler.filter(id => tumSertifikalar.find(s=>s.id===id)?.asama === 'imzalandı');
+        if(!imzalilar.length) return showToast('❌ Seçilenler arasında "imzalandı" aşamasında sertifika yok!', true);
+
+        showToast(`📄 ${imzalilar.length} imzalı PDF EronSign'a gönderiliyor...`);
+        try {
+            const dosyalar = [];
+            for(const id of imzalilar) {
+                const s = tumSertifikalar.find(x=>x.id===id);
+                const res = await fetch(`/api/sertifikalar/${id}/imzali-pdf`);
+                if(!res.ok) { showToast(`❌ #${id} imzalı PDF alınamadı!`, true); return; }
+                const { pdf_base64, sertifika_no } = await res.json();
+                const sertNo = (sertifika_no||s.sertifika_no||id).replace(/[/\\]/g,'-');
+                dosyalar.push({ sertifika_id: id, e_pdf_adi: id+'+'+sertNo+'_onay.pdf', e_pdf_base64: pdf_base64 });
+            }
+            const res = await fetch('http://localhost:5600/pdfImzala', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify(dosyalar)
+            });
+            if(res.ok) {
+                showToast(`⏳ ${imzalilar.length} PDF onaylanıyor, otomatik güncellenecek...`);
+                eronSignPoll(imzalilar, 'onaylandı');
+            } else showToast("❌ EronSign'a gönderilemedi!", true);
+        } catch(e) {
+            showToast('❌ EronSign servisine ulaşılamadı (localhost:5600).', true);
+        }
     }
 
     async function ieFisMailGonder(ieId) {
@@ -1569,15 +1609,45 @@
     async function topluMail() {
         const idler = secilenIdler();
         if(!idler.length) return showToast("❌ Sertifika seçin!", true);
-        const res = await fetch('/api/sertifika-mail-toplu', {
+
+        // Mail servisini kontrol et
+        try {
+            await fetch('http://localhost:5601/ping');
+        } catch(e) {
+            return showToast("❌ Mail servisi çalışmıyor! C:\\mail\\mail.bat'ı başlatın.", true);
+        }
+
+        // Railway'den sertifika + SMTP verilerini al
+        const veriRes = await fetch('/api/sertifika-mail-toplu-veri', {
             method:'POST', headers:{'Content-Type':'application/json'},
             body:JSON.stringify({idler})
         });
-        if(res.ok) {
-            const d = await res.json();
-            showToast(`📧 ${d.basarili} mail gönderildi!`);
+        if(!veriRes.ok) return showToast("❌ Veri alınamadı!", true);
+        const { gruplar, smtp } = await veriRes.json();
+
+        // Yerel mail servisine gönder
+        let basarili = 0;
+        for(const grup of gruplar) {
+            try {
+                const r = await fetch('http://localhost:5601/mailGonder', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({ smtp, mailler: grup.mailler, konu: grup.konu, html: grup.html })
+                });
+                if(r.ok) basarili += grup.adet;
+            } catch(e) {
+                showToast("❌ Mail gönderilemedi: " + e.message, true);
+            }
+        }
+
+        if(basarili > 0) {
+            // Aşamayı güncelle
+            await fetch('/api/sertifika-mail-toplu-guncelle', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({idler})
+            });
+            showToast(`📧 ${basarili} sertifika maili gönderildi!`);
             await sertYukle();
-        } else showToast("❌ Mail gönderilemedi!", true);
+        }
     }
 
     async function sertAsamaGuncelle(idler, asama) {
@@ -1979,5 +2049,6 @@
     window.onload = init;
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="sort-utils.js"></script>
 </body>
 </html>

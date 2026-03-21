@@ -463,10 +463,33 @@
         const sonuc = document.getElementById('smtpTestSonuc');
         sonuc.textContent = '⏳ Test ediliyor...';
         try {
-            const res = await fetch('/api/smtp-test', {method:'POST'});
+            await fetch('http://localhost:5601/ping');
+        } catch(e) {
+            sonuc.textContent = "❌ Mail servisi çalışmıyor! C:\\mail\\mail.bat'ı başlatın.";
+            return;
+        }
+        try {
+            const smtp = {
+                host: document.getElementById('smtp_host').value,
+                port: document.getElementById('smtp_port').value,
+                user: document.getElementById('smtp_user').value,
+                pass: document.getElementById('smtp_pass').value,
+                secure: document.getElementById('smtp_secure').value,
+                from_name: document.getElementById('smtp_from_name').value
+            };
+            const res = await fetch('http://localhost:5601/mailGonder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    smtp,
+                    mailler: [smtp.user],
+                    konu: 'LabQMS Pro - SMTP Test',
+                    html: '<p>SMTP bağlantısı başarılı! LabQMS Pro mail sistemi çalışıyor.</p>'
+                })
+            });
             if(res.ok) sonuc.textContent = '✅ Mail gönderildi!';
-            else { const e = await res.json(); sonuc.textContent = '❌ ' + (e.error||'Hata'); }
-        } catch(e) { sonuc.textContent = '❌ Sunucuya ulaşılamadı'; }
+            else { const e = await res.json(); sonuc.textContent = '❌ ' + (e.hata||'Hata'); }
+        } catch(e) { sonuc.textContent = '❌ ' + e.message; }
     }
 
     async function kaydet() {

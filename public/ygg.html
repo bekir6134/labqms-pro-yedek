@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Yönetimin Gözden Geçirmesi</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--primary:#1E40AF;--border:#e2e8f0;--bg:#f8fafc;--success:#10B981;--text:#334155}
+*{box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg);padding:24px;color:var(--text);margin:0}
+.accordion{background:#fff;border-radius:12px;border:1px solid var(--border);overflow:hidden;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.accordion-header{padding:15px 24px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.accordion-header.active{border-bottom:1px solid var(--border);background:#f1f5f9}
+.accordion-content{padding:24px;display:none}
+.card{background:#fff;border-radius:12px;border:1px solid var(--border);box-shadow:0 2px 6px rgba(0,0,0,0.04)}
+.card-header{padding:14px 22px;border-bottom:1px solid var(--border);background:#f8fafc;display:flex;align-items:center;justify-content:space-between}
+.card-title{font-weight:700;color:var(--primary);font-size:0.93rem}
+.fg{display:grid;gap:12px;margin-bottom:12px}
+.fg2{grid-template-columns:1fr 1fr}
+.fg3{grid-template-columns:1fr 1fr 1fr}
+.full{grid-column:1/-1}
+label{display:block;font-size:0.78rem;font-weight:700;color:#64748b;margin-bottom:4px}
+input,select,textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;outline:none;font-family:inherit;font-size:0.88rem;background:#fff;color:var(--text)}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(30,64,175,0.1)}
+textarea{resize:vertical;min-height:80px}
+.btn-save{background:linear-gradient(135deg,#1e3a8a,var(--primary));color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:700;cursor:pointer;font-size:0.9rem}
+table{width:100%;border-collapse:collapse}
+th{background:#f8fafc;padding:10px 12px;text-align:left;color:#64748b;font-size:0.78rem;border-bottom:2px solid var(--border)}
+td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.85rem;vertical-align:middle}
+.empty-row td{text-align:center;color:#94a3b8;padding:28px}
+.badge{padding:3px 9px;border-radius:10px;font-size:0.71rem;font-weight:700}
+.b-planlandı{background:#dbeafe;color:#1e40af}
+.b-tamamlandı{background:#d1fae5;color:#065f46}
+.search-box input{padding:9px 9px 9px 34px;background:#fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%2364748b" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>') no-repeat 10px center;border:1px solid var(--border);border-radius:8px;width:220px;outline:none;font-size:0.84rem}
+.act-wrap{position:relative;display:inline-block}
+.act-btn{background:#f8fafc;border:1px solid var(--border);padding:5px 11px;border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:600;color:var(--text);white-space:nowrap}
+.act-btn:hover{background:#e0e7ff;border-color:#a5b4fc;color:var(--primary)}
+.act-drop{display:none;position:fixed;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.12);z-index:9000;min-width:160px;overflow:hidden}
+.act-wrap.open .act-drop{display:block}
+.act-drop-item{padding:9px 15px;cursor:pointer;font-size:0.83rem;display:flex;align-items:center;gap:8px;color:var(--text)}
+.act-drop-item:hover{background:#f1f5f9}
+.act-drop-item.danger{color:#dc2626}
+.act-drop-item.danger:hover{background:#fee2e2}
+.act-drop hr{margin:4px 0;border:none;border-top:1px solid var(--border)}
+/* DETAY MODAL */
+#detayModal{display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.5);align-items:center;justify-content:center}
+#detayModal.open{display:flex}
+.detay-box{background:#fff;border-radius:14px;width:92%;max-width:720px;max-height:90vh;overflow-y:auto}
+.detay-head{padding:16px 22px;border-bottom:1px solid var(--border);background:#f8fafc;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:5;border-radius:14px 14px 0 0}
+.detay-body{padding:22px}
+.detay-label{font-size:0.78rem;font-weight:700;color:#64748b;margin-bottom:4px;margin-top:14px}
+.detay-val{font-size:0.88rem;color:var(--text);background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px 14px;white-space:pre-wrap}
+#toast{visibility:hidden;min-width:240px;background:var(--success);color:#fff;text-align:center;border-radius:8px;padding:13px;position:fixed;z-index:9999;right:24px;top:24px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+#toast.show{visibility:visible}
+#toast.error{background:#ef4444}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- DETAY MODAL -->
+<div id="detayModal">
+    <div class="detay-box">
+        <div class="detay-head">
+            <span style="font-weight:700;color:var(--primary);font-size:0.95rem" id="detayBaslik">📋 Toplantı Detayı</span>
+            <button onclick="detayKapat()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#64748b">✕</button>
+        </div>
+        <div class="detay-body" id="detayIcerik"></div>
+    </div>
+</div>
+
+<div class="accordion">
+    <div class="accordion-header" onclick="toggleAcc()" id="accHeader">
+        <h3 style="margin:0;color:var(--primary)">📋 Yeni YGG Toplantı Kaydı</h3>
+        <span id="accIcon">▼</span>
+    </div>
+    <div class="accordion-content" id="accContent">
+        <input type="hidden" id="duzenle_id">
+        <div class="fg fg3">
+            <div><label>Toplantı No</label><input type="text" id="toplanti_no" placeholder="YGG-2026-001"></div>
+            <div><label>Tarih</label><input type="date" id="tarih"></div>
+            <div>
+                <label>Durum</label>
+                <select id="durum">
+                    <option value="planlandı">Planlandı</option>
+                    <option value="tamamlandı">Tamamlandı</option>
+                </select>
+            </div>
+        </div>
+        <div class="fg fg2">
+            <div><label>Katılımcılar</label><input type="text" id="katilimcilar" placeholder="Ad Soyad, Ad Soyad..."></div>
+            <div><label>Bir Sonraki Toplantı</label><input type="date" id="bir_sonraki_tarih"></div>
+        </div>
+        <div class="fg">
+            <div class="full"><label>Gündem Maddeleri *</label><textarea id="gundem" placeholder="1. Önceki kararların takibi&#10;2. İç denetim sonuçları&#10;3. Müşteri şikayetleri..."></textarea></div>
+            <div class="full"><label>Kararlar / Aksiyonlar</label><textarea id="kararlar" placeholder="Alınan kararlar ve sorumlular..."></textarea></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px">
+            <button onclick="formTemizle()" style="background:#f1f5f9;color:#475569;border:none;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer">İptal</button>
+            <button class="btn-save" onclick="kaydet()" id="saveBtn">💾 Kaydet</button>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">📋 YGG Toplantı Listesi</div>
+        <div class="search-box"><input type="text" id="araInput" onkeyup="ara()" placeholder="Ara..."></div>
+    </div>
+    <div style="padding:18px">
+        <table><thead><tr>
+            <th>Toplantı No</th><th>Tarih</th><th>Katılımcılar</th><th>Bir Sonraki</th><th>Durum</th><th>İşlemler</th>
+        </tr></thead><tbody id="liste"></tbody></table>
+    </div>
+</div>
+
+<script>
+let tumKayitlar=[];
+
+function showToast(msg,err=false){const t=document.getElementById('toast');t.textContent=msg;t.className=err?'show error':'show';setTimeout(()=>t.className='',3200)}
+function toggleAcc(){const c=document.getElementById('accContent'),h=document.getElementById('accHeader'),i=document.getElementById('accIcon');const open=c.style.display==='block';c.style.display=open?'none':'block';h.classList.toggle('active',!open);i.textContent=open?'▼':'▲'}
+
+const DUR_LABEL={'planlandı':'Planlandı','tamamlandı':'Tamamlandı'};
+const DUR_RENK={'planlandı':'b-planlandı','tamamlandı':'b-tamamlandı'};
+
+async function listele(){
+    const r=await fetch('/api/ygg-toplanti');
+    tumKayitlar=await r.json();
+    uygulaFiltre();
+}
+function uygulaFiltre(){
+    let d=tumKayitlar;
+    const f=document.getElementById('araInput').value.toUpperCase();
+    if(f)d=d.filter(r=>(r.toplanti_no||'').toUpperCase().includes(f)||(r.katilimcilar||'').toUpperCase().includes(f));
+    renderListe(d);
+}
+function ara(){uygulaFiltre()}
+
+function renderListe(data){
+    const tb=document.getElementById('liste');
+    if(!data.length){tb.innerHTML='<tr class="empty-row"><td colspan="6">Kayıt yok.</td></tr>';return}
+    tb.innerHTML=data.map(r=>{
+        const durum=r.durum||'planlandı';
+        const tar=r.tarih?new Date(r.tarih).toLocaleDateString('tr-TR'):'-';
+        const son=r.bir_sonraki_tarih?new Date(r.bir_sonraki_tarih).toLocaleDateString('tr-TR'):'-';
+        return `<tr>
+            <td style="font-weight:700;color:var(--primary)">${r.toplanti_no||'—'}</td>
+            <td>${tar}</td>
+            <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.katilimcilar||'—'}</td>
+            <td>${son}</td>
+            <td><span class="badge ${DUR_RENK[durum]||''}">${DUR_LABEL[durum]||durum}</span></td>
+            <td>
+                <div class="act-wrap" id="am-${r.id}">
+                    <button class="act-btn" onclick="menuToggle(${r.id},event)">İşlemler ▾</button>
+                    <div class="act-drop">
+                        <div class="act-drop-item" onclick="detayAc(${r.id});menuKapat()">👁️ Detay</div>
+                        <hr>
+                        <div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>
+                        <div class="act-drop-item danger" onclick="sil(${r.id});menuKapat()">🗑️ Sil</div>
+                    </div>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function menuToggle(id,e){
+    e.stopPropagation();
+    document.querySelectorAll('.act-wrap.open').forEach(d=>d.classList.remove('open'));
+    const wrap=document.getElementById('am-'+id);if(!wrap)return;
+    const drop=wrap.querySelector('.act-drop');
+    const rect=wrap.getBoundingClientRect();
+    drop.style.top=(rect.bottom+4)+'px';drop.style.right=(window.innerWidth-rect.right)+'px';drop.style.left='auto';
+    wrap.classList.toggle('open');
+}
+function menuKapat(){document.querySelectorAll('.act-wrap.open').forEach(d=>d.classList.remove('open'))}
+document.addEventListener('click',menuKapat);
+document.addEventListener('scroll',menuKapat,true);
+
+async function kaydet(){
+    const gundem=document.getElementById('gundem').value.trim();
+    if(!gundem)return showToast('❌ Gündem zorunludur!',true);
+    const duzenleId=document.getElementById('duzenle_id').value;
+    const payload={
+        toplanti_no:document.getElementById('toplanti_no').value.trim(),
+        tarih:document.getElementById('tarih').value||null,
+        katilimcilar:document.getElementById('katilimcilar').value.trim(),
+        gundem,kararlar:document.getElementById('kararlar').value.trim(),
+        durum:document.getElementById('durum').value,
+        bir_sonraki_tarih:document.getElementById('bir_sonraki_tarih').value||null
+    };
+    if(!confirm(duzenleId?'Güncellemek istediğinize emin misiniz?':'Kaydetmek istediğinize emin misiniz?'))return;
+    const btn=document.getElementById('saveBtn');btn.disabled=true;btn.textContent='Kaydediliyor...';
+    const url=duzenleId?`/api/ygg-toplanti/${duzenleId}`:'/api/ygg-toplanti';
+    const res=await fetch(url,{method:duzenleId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(res.ok){showToast(duzenleId?'✅ Güncellendi!':'✅ Kaydedildi!');formTemizle();listele()}
+    else showToast('❌ Hata!',true);
+    btn.disabled=false;btn.textContent='💾 Kaydet';
+}
+
+function duzenle(id){
+    const r=tumKayitlar.find(x=>x.id===id);if(!r)return;
+    document.getElementById('duzenle_id').value=r.id;
+    document.getElementById('toplanti_no').value=r.toplanti_no||'';
+    document.getElementById('tarih').value=r.tarih?r.tarih.substring(0,10):'';
+    document.getElementById('katilimcilar').value=r.katilimcilar||'';
+    document.getElementById('gundem').value=r.gundem||'';
+    document.getElementById('kararlar').value=r.kararlar||'';
+    document.getElementById('durum').value=r.durum||'planlandı';
+    document.getElementById('bir_sonraki_tarih').value=r.bir_sonraki_tarih?r.bir_sonraki_tarih.substring(0,10):'';
+    document.getElementById('saveBtn').textContent='💾 Güncelle';
+    const c=document.getElementById('accContent');c.style.display='block';
+    document.getElementById('accHeader').classList.add('active');
+    document.getElementById('accIcon').textContent='▲';
+    window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function detayAc(id){
+    const r=tumKayitlar.find(x=>x.id===id);if(!r)return;
+    const tar=r.tarih?new Date(r.tarih).toLocaleDateString('tr-TR'):'-';
+    document.getElementById('detayBaslik').textContent=`📋 ${r.toplanti_no||'Toplantı'} — ${tar}`;
+    document.getElementById('detayIcerik').innerHTML=`
+        <div class="detay-label">Katılımcılar</div>
+        <div class="detay-val">${r.katilimcilar||'—'}</div>
+        <div class="detay-label">Gündem Maddeleri</div>
+        <div class="detay-val">${r.gundem||'—'}</div>
+        <div class="detay-label">Kararlar / Aksiyonlar</div>
+        <div class="detay-val">${r.kararlar||'—'}</div>
+        ${r.bir_sonraki_tarih?`<div class="detay-label">Bir Sonraki Toplantı</div><div class="detay-val">${new Date(r.bir_sonraki_tarih).toLocaleDateString('tr-TR')}</div>`:''}
+    `;
+    document.getElementById('detayModal').classList.add('open');
+}
+function detayKapat(){document.getElementById('detayModal').classList.remove('open')}
+
+async function sil(id){
+    if(!confirm('Bu toplantı kaydını silmek istediğinize emin misiniz?'))return;
+    const res=await fetch(`/api/ygg-toplanti/${id}`,{method:'DELETE'});
+    if(res.ok){showToast('🗑️ Silindi!');listele()}else showToast('❌ Silinemedi!',true);
+}
+
+function formTemizle(){
+    ['duzenle_id','toplanti_no','tarih','katilimcilar','gundem','kararlar','bir_sonraki_tarih'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('durum').value='planlandı';
+    document.getElementById('saveBtn').textContent='💾 Kaydet';
+    document.getElementById('accContent').style.display='none';
+    document.getElementById('accHeader').classList.remove('active');
+    document.getElementById('accIcon').textContent='▼';
+}
+
+listele();
+</script>
+<script src="sort-utils.js"></script>
+</body>
+</html>

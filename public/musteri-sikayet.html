@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Müşteri Şikayeti</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--primary:#1E40AF;--border:#e2e8f0;--bg:#f8fafc;--success:#10B981;--text:#334155}
+*{box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg);padding:24px;color:var(--text);margin:0}
+.accordion{background:#fff;border-radius:12px;border:1px solid var(--border);overflow:hidden;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.accordion-header{padding:15px 24px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.accordion-header.active{border-bottom:1px solid var(--border);background:#f1f5f9}
+.accordion-content{padding:24px;display:none}
+.card{background:#fff;border-radius:12px;border:1px solid var(--border);box-shadow:0 2px 6px rgba(0,0,0,0.04)}
+.card-header{padding:14px 22px;border-bottom:1px solid var(--border);background:#f8fafc;display:flex;align-items:center;justify-content:space-between}
+.card-title{font-weight:700;color:var(--primary);font-size:0.93rem}
+.fg{display:grid;gap:12px;margin-bottom:12px}
+.fg2{grid-template-columns:1fr 1fr}
+.fg3{grid-template-columns:1fr 1fr 1fr}
+.full{grid-column:1/-1}
+label{display:block;font-size:0.78rem;font-weight:700;color:#64748b;margin-bottom:4px}
+input,select,textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;outline:none;font-family:inherit;font-size:0.88rem;background:#fff;color:var(--text)}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(30,64,175,0.1)}
+textarea{resize:vertical;min-height:60px}
+.btn-save{background:linear-gradient(135deg,#1e3a8a,var(--primary));color:#fff;border:none;padding:10px 24px;border-radius:10px;font-weight:700;cursor:pointer;font-size:0.9rem}
+table{width:100%;border-collapse:collapse}
+th{background:#f8fafc;padding:10px 12px;text-align:left;color:#64748b;font-size:0.78rem;border-bottom:2px solid var(--border)}
+td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.85rem;vertical-align:middle}
+.empty-row td{text-align:center;color:#94a3b8;padding:28px}
+.badge{padding:3px 9px;border-radius:10px;font-size:0.71rem;font-weight:700}
+.b-acik{background:#fee2e2;color:#dc2626}
+.b-islemde{background:#fef9c3;color:#854d0e}
+.b-kapali{background:#d1fae5;color:#065f46}
+.b-dusuk{background:#f1f5f9;color:#475569}
+.b-orta{background:#fef9c3;color:#854d0e}
+.b-yuksek{background:#fee2e2;color:#dc2626}
+.b-kritik{background:#fecaca;color:#991b1b}
+.search-box input{padding:9px 9px 9px 34px;background:#fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%2364748b" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>') no-repeat 10px center;border:1px solid var(--border);border-radius:8px;width:220px;outline:none;font-size:0.84rem}
+.act-wrap{position:relative;display:inline-block}
+.act-btn{background:#f8fafc;border:1px solid var(--border);padding:5px 11px;border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:600;color:var(--text);white-space:nowrap}
+.act-btn:hover{background:#e0e7ff;border-color:#a5b4fc;color:var(--primary)}
+.act-drop{display:none;position:fixed;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.12);z-index:9000;min-width:160px;overflow:hidden}
+.act-wrap.open .act-drop{display:block}
+.act-drop-item{padding:9px 15px;cursor:pointer;font-size:0.83rem;display:flex;align-items:center;gap:8px;color:var(--text)}
+.act-drop-item:hover{background:#f1f5f9}
+.act-drop-item.danger{color:#dc2626}
+.act-drop-item.danger:hover{background:#fee2e2}
+.act-drop hr{margin:4px 0;border:none;border-top:1px solid var(--border)}
+.kanban{display:flex;gap:10px;flex-wrap:wrap;padding:16px 18px 0}
+.kol{flex:1;min-width:100px;border:2px solid var(--border);border-radius:10px;padding:10px 14px;cursor:pointer;text-align:center;background:#fff;transition:0.18s}
+.kol:hover{border-color:#93c5fd;background:#f0f9ff}
+.kol.aktif{border-color:var(--primary);background:#eff6ff;transform:translateY(-3px);box-shadow:0 4px 14px rgba(30,64,175,0.15)}
+.kol-sayi{font-size:1.4rem;font-weight:800;color:var(--primary)}
+.kol-label{font-size:0.72rem;font-weight:700;color:#64748b;margin-top:2px}
+#toast{visibility:hidden;min-width:240px;background:var(--success);color:#fff;text-align:center;border-radius:8px;padding:13px;position:fixed;z-index:9999;right:24px;top:24px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+#toast.show{visibility:visible}
+#toast.error{background:#ef4444}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+
+<div class="accordion">
+    <div class="accordion-header" onclick="toggleAcc()" id="accHeader">
+        <h3 style="margin:0;color:var(--primary)">💬 Yeni Şikayet Kaydı</h3>
+        <span id="accIcon">▼</span>
+    </div>
+    <div class="accordion-content" id="accContent">
+        <input type="hidden" id="duzenle_id">
+        <div class="fg fg3">
+            <div><label>Şikayet No</label><input type="text" id="sikayet_no" placeholder="SIK-2026-001"></div>
+            <div><label>Tarih</label><input type="date" id="tarih"></div>
+            <div>
+                <label>Öncelik</label>
+                <select id="oncelik">
+                    <option value="dusuk">Düşük</option>
+                    <option value="orta" selected>Orta</option>
+                    <option value="yuksek">Yüksek</option>
+                    <option value="kritik">Kritik</option>
+                </select>
+            </div>
+        </div>
+        <div class="fg fg2">
+            <div><label>Müşteri Adı</label><input type="text" id="musteri_adi" placeholder="Firma adı..."></div>
+            <div>
+                <label>Durum</label>
+                <select id="durum">
+                    <option value="acik">Açık</option>
+                    <option value="islemde">İşlemde</option>
+                    <option value="kapali">Kapalı</option>
+                </select>
+            </div>
+        </div>
+        <div class="fg">
+            <div class="full"><label>Şikayet Açıklaması *</label><textarea id="aciklama" placeholder="Şikayetin detaylı açıklaması..."></textarea></div>
+            <div class="full"><label>Sonuç / Çözüm</label><textarea id="sonuc" placeholder="Yapılan işlem ve sonuç..."></textarea></div>
+        </div>
+        <div class="fg fg2">
+            <div><label>Kapanış Tarihi</label><input type="date" id="kapatis_tarihi"></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px">
+            <button onclick="formTemizle()" style="background:#f1f5f9;color:#475569;border:none;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer">İptal</button>
+            <button class="btn-save" onclick="kaydet()" id="saveBtn">💾 Kaydet</button>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">📋 Şikayet Listesi</div>
+        <div class="search-box"><input type="text" id="araInput" onkeyup="ara()" placeholder="Ara..."></div>
+    </div>
+    <div class="kanban" id="kanban"></div>
+    <div style="padding:0 18px 18px">
+        <table><thead><tr>
+            <th>Şikayet No</th><th>Tarih</th><th>Müşteri</th><th>Açıklama</th><th>Öncelik</th><th>Durum</th><th>İşlemler</th>
+        </tr></thead><tbody id="liste"></tbody></table>
+    </div>
+</div>
+
+<script>
+let tumKayitlar=[], aktifFiltre='';
+
+function showToast(msg,err=false){const t=document.getElementById('toast');t.textContent=msg;t.className=err?'show error':'show';setTimeout(()=>t.className='',3200)}
+function toggleAcc(){const c=document.getElementById('accContent'),h=document.getElementById('accHeader'),i=document.getElementById('accIcon');const open=c.style.display==='block';c.style.display=open?'none':'block';h.classList.toggle('active',!open);i.textContent=open?'▼':'▲'}
+
+const DUR_LABEL={acik:'Açık',islemde:'İşlemde',kapali:'Kapalı'};
+const DUR_RENK={acik:'b-acik',islemde:'b-islemde',kapali:'b-kapali'};
+const ONC_LABEL={dusuk:'Düşük',orta:'Orta',yuksek:'Yüksek',kritik:'Kritik'};
+const ONC_RENK={dusuk:'b-dusuk',orta:'b-orta',yuksek:'b-yuksek',kritik:'b-kritik'};
+
+function renderKanban(){
+    const wrap=document.getElementById('kanban');
+    wrap.innerHTML=['acik','islemde','kapali'].map(a=>{
+        const s=tumKayitlar.filter(r=>(r.durum||'acik')===a).length;
+        const ak=aktifFiltre===a;
+        return `<div class="kol${ak?' aktif':''}" onclick="kanbanFiltrele('${a}')">
+            <div class="kol-sayi">${ak?'✔ ':''}${s}</div>
+            <div class="kol-label">${DUR_LABEL[a]}</div>
+        </div>`;
+    }).join('');
+}
+function kanbanFiltrele(a){aktifFiltre=aktifFiltre===a?'':a;renderKanban();uygulaFiltre()}
+function uygulaFiltre(){
+    let d=tumKayitlar;
+    if(aktifFiltre)d=d.filter(r=>(r.durum||'acik')===aktifFiltre);
+    const f=document.getElementById('araInput').value.toUpperCase();
+    if(f)d=d.filter(r=>(r.sikayet_no||'').toUpperCase().includes(f)||(r.musteri_adi||'').toUpperCase().includes(f));
+    renderListe(d);
+}
+function ara(){uygulaFiltre()}
+
+async function listele(){
+    const r=await fetch('/api/musteri-sikayet');
+    tumKayitlar=await r.json();
+    renderKanban();uygulaFiltre();
+}
+
+function renderListe(data){
+    const tb=document.getElementById('liste');
+    if(!data.length){tb.innerHTML='<tr class="empty-row"><td colspan="7">Kayıt yok.</td></tr>';return}
+    tb.innerHTML=data.map(r=>{
+        const durum=r.durum||'acik',onc=r.oncelik||'orta';
+        const tar=r.tarih?new Date(r.tarih).toLocaleDateString('tr-TR'):'-';
+        const ac=r.aciklama||'';
+        return `<tr>
+            <td style="font-weight:700;color:var(--primary)">${r.sikayet_no||'—'}</td>
+            <td>${tar}</td>
+            <td>${r.musteri_adi||'—'}</td>
+            <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${ac}">${ac}</td>
+            <td><span class="badge ${ONC_RENK[onc]}">${ONC_LABEL[onc]}</span></td>
+            <td><span class="badge ${DUR_RENK[durum]}">${DUR_LABEL[durum]}</span></td>
+            <td>
+                <div class="act-wrap" id="am-${r.id}">
+                    <button class="act-btn" onclick="menuToggle(${r.id},event)">İşlemler ▾</button>
+                    <div class="act-drop">
+                        <div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>
+                        <div class="act-drop-item danger" onclick="sil(${r.id});menuKapat()">🗑️ Sil</div>
+                    </div>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function menuToggle(id,e){
+    e.stopPropagation();
+    document.querySelectorAll('.act-wrap.open').forEach(d=>d.classList.remove('open'));
+    const wrap=document.getElementById('am-'+id);if(!wrap)return;
+    const drop=wrap.querySelector('.act-drop');
+    const rect=wrap.getBoundingClientRect();
+    drop.style.top=(rect.bottom+4)+'px';drop.style.right=(window.innerWidth-rect.right)+'px';drop.style.left='auto';
+    wrap.classList.toggle('open');
+}
+function menuKapat(){document.querySelectorAll('.act-wrap.open').forEach(d=>d.classList.remove('open'))}
+document.addEventListener('click',menuKapat);
+document.addEventListener('scroll',menuKapat,true);
+
+async function kaydet(){
+    const aciklama=document.getElementById('aciklama').value.trim();
+    if(!aciklama)return showToast('❌ Açıklama zorunludur!',true);
+    const duzenleId=document.getElementById('duzenle_id').value;
+    const payload={
+        sikayet_no:document.getElementById('sikayet_no').value.trim(),
+        tarih:document.getElementById('tarih').value||null,
+        musteri_adi:document.getElementById('musteri_adi').value.trim(),
+        aciklama,oncelik:document.getElementById('oncelik').value,
+        durum:document.getElementById('durum').value,
+        kapatis_tarihi:document.getElementById('kapatis_tarihi').value||null,
+        sonuc:document.getElementById('sonuc').value.trim()
+    };
+    if(!confirm(duzenleId?'Güncellemek istediğinize emin misiniz?':'Kaydetmek istediğinize emin misiniz?'))return;
+    const btn=document.getElementById('saveBtn');btn.disabled=true;btn.textContent='Kaydediliyor...';
+    const url=duzenleId?`/api/musteri-sikayet/${duzenleId}`:'/api/musteri-sikayet';
+    const res=await fetch(url,{method:duzenleId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(res.ok){showToast(duzenleId?'✅ Güncellendi!':'✅ Kaydedildi!');formTemizle();listele()}
+    else showToast('❌ Hata!',true);
+    btn.disabled=false;btn.textContent='💾 Kaydet';
+}
+
+function duzenle(id){
+    const r=tumKayitlar.find(x=>x.id===id);if(!r)return;
+    document.getElementById('duzenle_id').value=r.id;
+    document.getElementById('sikayet_no').value=r.sikayet_no||'';
+    document.getElementById('tarih').value=r.tarih?r.tarih.substring(0,10):'';
+    document.getElementById('musteri_adi').value=r.musteri_adi||'';
+    document.getElementById('aciklama').value=r.aciklama||'';
+    document.getElementById('oncelik').value=r.oncelik||'orta';
+    document.getElementById('durum').value=r.durum||'acik';
+    document.getElementById('kapatis_tarihi').value=r.kapatis_tarihi?r.kapatis_tarihi.substring(0,10):'';
+    document.getElementById('sonuc').value=r.sonuc||'';
+    document.getElementById('saveBtn').textContent='💾 Güncelle';
+    const c=document.getElementById('accContent');c.style.display='block';
+    document.getElementById('accHeader').classList.add('active');
+    document.getElementById('accIcon').textContent='▲';
+    window.scrollTo({top:0,behavior:'smooth'});
+}
+
+async function sil(id){
+    if(!confirm('Bu kaydı silmek istediğinize emin misiniz?'))return;
+    const res=await fetch(`/api/musteri-sikayet/${id}`,{method:'DELETE'});
+    if(res.ok){showToast('🗑️ Silindi!');listele()}else showToast('❌ Silinemedi!',true);
+}
+
+function formTemizle(){
+    ['duzenle_id','sikayet_no','tarih','musteri_adi','aciklama','sonuc','kapatis_tarihi'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('oncelik').value='orta';document.getElementById('durum').value='acik';
+    document.getElementById('saveBtn').textContent='💾 Kaydet';
+    document.getElementById('accContent').style.display='none';
+    document.getElementById('accHeader').classList.remove('active');
+    document.getElementById('accIcon').textContent='▼';
+}
+
+listele();
+</script>
+<script src="sort-utils.js"></script>
+</body>
+</html>

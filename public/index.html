@@ -79,6 +79,22 @@
                 <a href="personel.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>👤</span> Personel ve Yetkiler</a>
                 <a href="ayarlar.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>🔧</span> Sistem Ayarları</a>
             </div>
+
+            <!-- KALİTE SİSTEMİ - ALT MENÜ -->
+            <div class="menu-group-header" onclick="toggleKaliteSubmenu()">
+                <span style="display:flex; align-items:center; gap:12px;"><span>🏅</span> Kalite Sistemi</span>
+                <span class="arrow" id="kaliteArrow">▼</span>
+            </div>
+            <div class="submenu" id="kaliteSubmenu">
+                <a href="kalite-dokuman.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>📂</span> Doküman Yönetimi</a>
+                <a href="uygunsuzluk.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>⚠️</span> Uygunsuzluk & DÖF</a>
+                <a href="ic-denetim.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>🔍</span> İç Denetim</a>
+                <a href="risk-kaydi.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>📊</span> Risk & Fırsat</a>
+                <a href="musteri-sikayet.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>💬</span> Müşteri Şikayeti</a>
+                <a href="dis-tedarikci.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>🤝</span> Dış Tedarikçi</a>
+                <a href="yeterlilik-testi.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>🧪</span> Yeterlilik Testi</a>
+                <a href="ygg.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>📋</span> Yön. Gözden Geçirme</a>
+            </div>
         </div>
     </aside>
 
@@ -108,11 +124,16 @@
 
         function toggleSubmenu() {
             const submenu = document.getElementById("adminSubmenu");
-            const header = document.querySelector(".menu-group-header");
             const arrow = document.getElementById("adminArrow");
             const isOpen = submenu.classList.contains("open");
             submenu.classList.toggle("open");
-            header.classList.toggle("open");
+            arrow.innerText = isOpen ? "▼" : "▲";
+        }
+        function toggleKaliteSubmenu() {
+            const submenu = document.getElementById("kaliteSubmenu");
+            const arrow = document.getElementById("kaliteArrow");
+            const isOpen = submenu.classList.contains("open");
+            submenu.classList.toggle("open");
             arrow.innerText = isOpen ? "▼" : "▲";
         }
         function labAdiGuncelle(ad) {
