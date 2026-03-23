@@ -90,10 +90,51 @@
         #toast.error { background:#ef4444; }
         #toast.warn { background:#d97706; }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
+
+        /* AI ASISTAN */
+        #aiBtn{position:fixed;bottom:28px;right:28px;z-index:8000;background:linear-gradient(135deg,#1e3a8a,#1E40AF);color:#fff;border:none;border-radius:50px;padding:13px 20px;font-size:0.9rem;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(30,64,175,0.4);display:flex;align-items:center;gap:8px;transition:0.2s}
+        #aiBtn:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(30,64,175,0.5)}
+        #aiPanel{display:none;position:fixed;bottom:90px;right:28px;z-index:8000;width:380px;max-width:calc(100vw - 40px);background:#fff;border-radius:16px;border:1px solid var(--border);box-shadow:0 12px 48px rgba(0,0,0,0.18);flex-direction:column;overflow:hidden}
+        #aiPanel.open{display:flex}
+        .ai-head{background:linear-gradient(135deg,#1e3a8a,#1E40AF);color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between}
+        .ai-head-title{font-weight:700;font-size:0.92rem;display:flex;align-items:center;gap:8px}
+        .ai-close{background:none;border:none;color:rgba(255,255,255,0.8);font-size:1.1rem;cursor:pointer}
+        .ai-close:hover{color:#fff}
+        #aiMesajlar{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;min-height:260px;max-height:380px}
+        .ai-msg{max-width:85%;padding:10px 13px;border-radius:12px;font-size:0.85rem;line-height:1.55;word-break:break-word}
+        .ai-msg.kullanici{background:#eff6ff;color:#1e40af;align-self:flex-end;border-bottom-right-radius:3px}
+        .ai-msg.asistan{background:#f8fafc;color:var(--text);align-self:flex-start;border:1px solid var(--border);border-bottom-left-radius:3px}
+        .ai-msg.yukleniyor{color:#94a3b8;font-style:italic}
+        .ai-input-row{padding:12px;border-top:1px solid var(--border);display:flex;gap:8px;background:#fafafa}
+        #aiInput{flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:9px;outline:none;font-family:inherit;font-size:0.85rem;resize:none}
+        #aiInput:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(30,64,175,0.1)}
+        #aiGonderBtn{background:var(--primary);color:#fff;border:none;border-radius:9px;padding:9px 14px;cursor:pointer;font-size:0.9rem;flex-shrink:0}
+        #aiGonderBtn:disabled{opacity:0.5;cursor:not-allowed}
+        .ai-temizle{background:none;border:none;color:rgba(255,255,255,0.6);font-size:0.75rem;cursor:pointer;padding:0}
+        .ai-temizle:hover{color:#fff}
     </style>
 </head>
 <body>
 <div id="toast"></div>
+
+<!-- AI ASISTAN PANELİ -->
+<div id="aiPanel">
+    <div class="ai-head">
+        <div class="ai-head-title">🤖 AI Asistan <span style="font-size:0.72rem;opacity:0.7;font-weight:400">Groq · Llama 3.3</span></div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <button class="ai-temizle" onclick="aiTemizle()">🗑️ Temizle</button>
+            <button class="ai-close" onclick="aiPanelKapat()">✕</button>
+        </div>
+    </div>
+    <div id="aiMesajlar">
+        <div class="ai-msg asistan">Merhaba! Kalite yönetimi, uygunsuzluk analizi, ISO 17025 veya DÖF süreçleri hakkında soru sorabilirsin.</div>
+    </div>
+    <div class="ai-input-row">
+        <textarea id="aiInput" rows="1" placeholder="Bir soru yaz..." onkeydown="aiEnterGonder(event)"></textarea>
+        <button id="aiGonderBtn" onclick="aiGonder()">➤</button>
+    </div>
+</div>
+<button id="aiBtn" onclick="aiPanelToggle()">🤖 AI Asistan</button>
 
 <!-- TAKVİM MODAL -->
 <div id="calModal">
@@ -181,7 +222,7 @@
     <!-- YAKLAŞAN AKTİVİTELER -->
     <div class="card">
         <div class="card-head" style="display:flex;align-items:center;justify-content:space-between;">
-            <div class="card-title">⚠️ Yaklaşan Aktiviteler (30 Gün)</div>
+            <div class="card-title">🔔 Güncel Durum & Bildirimler</div>
             <span id="yaklasanRozet" style="display:none;background:#ef4444;color:#fff;border-radius:12px;padding:2px 9px;font-size:0.72rem;font-weight:700;animation:pulse 1.5s infinite;"></span>
         </div>
         <div class="card-body" id="yaklasanListesi">
@@ -272,7 +313,7 @@
             document.getElementById("k3").textContent = d.onay_bekleyen;
             document.getElementById("k4").textContent = d.bu_yil;
             document.getElementById("k5").textContent = d.musteri_sayisi;
-            renderYaklasan(d.yaklasan_aktiviteler || []);
+            renderYaklasan(d.yaklasan_aktiviteler || [], d.son_revizyonlar || []);
             renderBildirimler(d.yaklasan_aktiviteler || [], d.yaklasan_etkinlikler || []);
         } catch(e) { console.error(e); }
     }
@@ -311,7 +352,7 @@
             <div style="font-size:1.3rem;flex-shrink:0;">${kritikVar ? '🚨' : '⚠️'}</div>
             <div style="flex:1;">
                 <div style="font-weight:700;margin-bottom:6px;font-size:0.88rem;color:${kritikVar?'#dc2626':'#854d0e'};">
-                    ${kritikVar ? 'Kritik Bildirimler' : 'Yaklaşan Aktiviteler'} (${items.length})
+                    ${kritikVar ? 'Kritik Bildirimler' : 'Güncel Durum & Bildirimler'} (${items.length})
                 </div>
                 ${items.map(i => `<div class="bildirim-item" style="${i.kritik?'font-weight:600;color:#dc2626;':''}">
                     ${i.kritik ? '🔴' : '🟡'} ${i.text}
@@ -320,11 +361,11 @@
             <button onclick="this.parentElement.style.display='none'" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:1rem;flex-shrink:0;align-self:flex-start;">✕</button>`;
     }
 
-    function renderYaklasan(liste) {
+    function renderYaklasan(liste, revizyonlar) {
         const el = document.getElementById("yaklasanListesi");
         const rozet = document.getElementById("yaklasanRozet");
 
-        if (!liste.length) {
+        if (!liste.length && !revizyonlar.length) {
             el.innerHTML = '<div style="color:#94a3b8;font-size:0.85rem;text-align:center;padding:10px;">Yaklaşan aktivite yok 🎉</div>';
             rozet.style.display = 'none';
             return;
@@ -356,6 +397,18 @@
             }
         }
 
+        const revHtml = revizyonlar.map(r => {
+            const tarih = r.revizyon_tarihi ? new Date(r.revizyon_tarihi).toLocaleDateString('tr-TR') : '-';
+            return `<div class="yakl-item">
+                <span style="font-size:1.1rem;">📄</span>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;font-size:0.83rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.baslik}</div>
+                    <div style="color:#94a3b8;font-size:0.75rem;">${r.dok_no||''} · ${r.revizyon_no||''} · ${tarih}</div>
+                </div>
+                <span class="gun-badge gun-yellow">Revize Edildi</span>
+            </div>`;
+        }).join('');
+
         el.innerHTML = liste.map(r => {
             const gun = parseInt(r.kalan_gun);
             const tarih = new Date(r.sonraki_kal_tarihi).toLocaleDateString('tr-TR');
@@ -370,7 +423,7 @@
                 </div>
                 <span class="gun-badge ${cls}">${gunText}</span>
             </div>`;
-        }).join('');
+        }).join('') + revHtml;
     }
 
     // ── SON İŞ EMİRLERİ ──
@@ -593,6 +646,60 @@
     }
 
     window.onload = init;
+
+    // ── AI ASISTAN ──
+    let aiGecmis = [];
+
+    function aiPanelToggle() { document.getElementById('aiPanel').classList.toggle('open'); }
+    function aiPanelKapat() { document.getElementById('aiPanel').classList.remove('open'); }
+    function aiTemizle() {
+        aiGecmis = [];
+        document.getElementById('aiMesajlar').innerHTML = '<div class="ai-msg asistan">Merhaba! Kalite yönetimi, uygunsuzluk analizi, ISO 17025 veya DÖF süreçleri hakkında soru sorabilirsin.</div>';
+    }
+
+    function aiEnterGonder(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aiGonder(); }
+    }
+
+    async function aiGonder() {
+        const input = document.getElementById('aiInput');
+        const mesaj = input.value.trim();
+        if (!mesaj) return;
+
+        const kutu = document.getElementById('aiMesajlar');
+        kutu.innerHTML += `<div class="ai-msg kullanici">${mesaj.replace(/</g,'&lt;')}</div>`;
+        const yukleniyorDiv = document.createElement('div');
+        yukleniyorDiv.className = 'ai-msg yukleniyor asistan';
+        yukleniyorDiv.textContent = '...';
+        kutu.appendChild(yukleniyorDiv);
+        kutu.scrollTop = kutu.scrollHeight;
+
+        input.value = '';
+        const btn = document.getElementById('aiGonderBtn');
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/ai/sor', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ mesaj, gecmis: aiGecmis })
+            });
+            const data = await res.json();
+            kutu.removeChild(yukleniyorDiv);
+            if (data.cevap) {
+                aiGecmis.push({ role:'user', content: mesaj });
+                aiGecmis.push({ role:'assistant', content: data.cevap });
+                kutu.innerHTML += `<div class="ai-msg asistan">${data.cevap.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>`;
+            } else {
+                kutu.innerHTML += `<div class="ai-msg asistan" style="color:#dc2626">❌ ${data.hata||'Hata oluştu.'}</div>`;
+            }
+        } catch(e) {
+            kutu.removeChild(yukleniyorDiv);
+            kutu.innerHTML += `<div class="ai-msg asistan" style="color:#dc2626">❌ Bağlantı hatası.</div>`;
+        }
+        btn.disabled = false;
+        kutu.scrollTop = kutu.scrollHeight;
+    }
 </script>
 </body>
 </html>

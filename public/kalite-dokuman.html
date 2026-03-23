@@ -52,6 +52,19 @@ td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.85rem;ver
 #toast{visibility:hidden;min-width:240px;background:var(--success);color:#fff;text-align:center;border-radius:8px;padding:13px;position:fixed;z-index:9999;right:24px;top:24px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
 #toast.show{visibility:visible}
 #toast.error{background:#ef4444}
+.excelModalWrap.open{display:flex!important}
+#onayModal{display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);align-items:center;justify-content:center}
+#onayModal.open{display:flex!important}
+.onay-box{background:#fff;border-radius:16px;padding:28px 32px;width:92%;max-width:400px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2)}
+.onay-icon{font-size:2.4rem;margin-bottom:10px}
+.onay-mesaj{font-size:0.95rem;color:var(--text);margin-bottom:20px;font-weight:500;line-height:1.5}
+.onay-btns{display:flex;gap:10px;justify-content:center}
+.onay-iptal{background:#f1f5f9;color:#475569;border:none;padding:10px 24px;border-radius:9px;font-weight:600;cursor:pointer;font-size:0.9rem}
+.onay-evet{background:linear-gradient(135deg,#1e3a8a,#1E40AF);color:#fff;border:none;padding:10px 24px;border-radius:9px;font-weight:700;cursor:pointer;font-size:0.9rem}
+.onay-evet.danger{background:linear-gradient(135deg,#991b1b,#dc2626)}
+#dropZone.dragover{background:#dbeafe;border-color:#3b82f6}
+.modal-wrap{display:none;position:fixed;inset:0;z-index:4000;background:rgba(0,0,0,0.55);align-items:center;justify-content:center}
+.modal-wrap.open{display:flex!important}
 </style>
 </head>
 <body>
@@ -87,10 +100,9 @@ td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.85rem;ver
                 </select>
             </div>
         </div>
-        <div class="fg fg3">
+        <div class="fg fg2">
             <div><label>Yayın Tarihi</label><input type="date" id="yayin_tarihi"></div>
-            <div><label>Geçerlilik Tarihi</label><input type="date" id="gecerlilik_tarihi"></div>
-            <div><label>Sorumlu</label><input type="text" id="sorumlu" placeholder="Ad Soyad"></div>
+            <div><label>Revizyon Tarihi</label><input type="date" id="gecerlilik_tarihi"></div>
         </div>
         <div class="fg">
             <div class="full"><label>Açıklama</label><textarea id="aciklama" placeholder="Kısa açıklama..."></textarea></div>
@@ -105,47 +117,70 @@ td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.85rem;ver
 <div class="card">
     <div class="card-header">
         <div class="card-title">📋 Doküman Listesi</div>
-        <div class="search-box"><input type="text" id="araInput" onkeyup="ara()" placeholder="Ara..."></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button onclick="excelModalAc()" style="background:#f0fdf4;color:#166534;border:1px solid #86efac;padding:7px 14px;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.83rem">📊 Excel ile Toplu Aktar</button>
+            <select id="turFiltre" onchange="uygulaFiltre()" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.84rem;font-family:inherit;background:#fff">
+                <option value="">Tüm Türler</option>
+                <option>Prosedür</option><option>Talimat</option><option>Form</option><option>El Kitabı</option><option>Diğer</option>
+            </select>
+            <select id="durumFiltre" onchange="uygulaFiltre()" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.84rem;font-family:inherit;background:#fff">
+                <option value="">Tüm Durumlar</option>
+                <option value="taslak">Taslak</option><option value="yayinda">Yayında</option><option value="iptal">İptal</option>
+            </select>
+            <div class="search-box"><input type="text" id="araInput" onkeyup="uygulaFiltre()" placeholder="Ara..."></div>
+        </div>
     </div>
     <div class="kanban" id="kanban"></div>
+    <div id="topluBar" style="display:none;background:#1e3a8a;color:#fff;border-radius:10px;padding:10px 18px;margin:0 18px 12px;align-items:center;gap:12px;flex-wrap:wrap">
+        <span id="topluSayiYazi" style="font-weight:700;font-size:0.95rem"></span>
+        <button onclick="topluSil()" style="background:#ef4444;color:#fff;border:none;padding:7px 18px;border-radius:7px;font-weight:700;cursor:pointer">🗑️ Seçilenleri Sil</button>
+        <button onclick="secimiTemizle()" style="background:#475569;color:#fff;border:none;padding:7px 14px;border-radius:7px;font-weight:600;cursor:pointer">✖ İptal</button>
+    </div>
     <div style="padding:0 18px 18px">
         <table><thead><tr>
-            <th>Dok. No</th><th>Başlık</th><th>Tür</th><th>Rev.</th><th>Yayın Tarihi</th><th>Sorumlu</th><th>Durum</th><th>İşlemler</th>
+            <th style="width:36px"><input type="checkbox" id="tumunuSecCB" onchange="tumunuSec(this)"></th>
+            <th>Dok. No</th><th>Başlık</th><th>Tür</th><th>Rev.</th><th>Yayın Tarihi</th><th>Revizyon Tarihi</th><th>Durum</th><th>İşlemler</th>
         </tr></thead><tbody id="liste"></tbody></table>
     </div>
 </div>
 
 <script>
-let tumKayitlar = [], aktifFiltre = '';
+let tumKayitlar = [], aktifFiltre = '', aktifTurFiltre = '';
 
 function showToast(msg,err=false){const t=document.getElementById('toast');t.textContent=msg;t.className=err?'show error':'show';setTimeout(()=>t.className='',3200)}
 function toggleAcc(){const c=document.getElementById('accContent'),h=document.getElementById('accHeader'),i=document.getElementById('accIcon');const open=c.style.display==='block';c.style.display=open?'none':'block';h.classList.toggle('active',!open);i.textContent=open?'▼':'▲'}
 
 const DUR_LABEL={taslak:'Taslak',yayinda:'Yayında',iptal:'İptal'};
 const DUR_RENK={taslak:'badge-taslak',yayinda:'badge-yayinda',iptal:'badge-iptal'};
-const DUR_ASAMALAR=['taslak','yayinda','iptal'];
+const TUR_LISTESI=['Prosedür','Talimat','Form','El Kitabı','Diğer'];
 
 function renderKanban(){
     const wrap=document.getElementById('kanban');
-    wrap.innerHTML=DUR_ASAMALAR.map(a=>{
-        const s=tumKayitlar.filter(r=>(r.durum||'taslak')===a).length;
-        const ak=aktifFiltre===a;
-        return `<div class="kol${ak?' aktif':''}" onclick="kanbanFiltrele('${a}')">
+    wrap.innerHTML=TUR_LISTESI.map(t=>{
+        const s=tumKayitlar.filter(r=>(r.tur||'')===t).length;
+        const ak=aktifTurFiltre===t;
+        return `<div class="kol${ak?' aktif':''}" onclick="kanbanFiltrele('${t}')">
             <div class="kol-sayi">${ak?'✔ ':''}${s}</div>
-            <div class="kol-label">${DUR_LABEL[a]||a}</div>
+            <div class="kol-label">${t}</div>
         </div>`;
     }).join('');
 }
 
-function kanbanFiltrele(a){aktifFiltre=aktifFiltre===a?'':a;renderKanban();uygulaFiltre()}
+function kanbanFiltrele(t){
+    aktifTurFiltre=aktifTurFiltre===t?'':t;
+    document.getElementById('turFiltre').value=aktifTurFiltre;
+    renderKanban();uygulaFiltre();
+}
 function uygulaFiltre(){
     let d=tumKayitlar;
-    if(aktifFiltre)d=d.filter(r=>(r.durum||'taslak')===aktifFiltre);
+    const tur=document.getElementById('turFiltre')?.value||aktifTurFiltre||'';
+    if(tur)d=d.filter(r=>(r.tur||'')===tur);
+    const durum=document.getElementById('durumFiltre')?.value||'';
+    if(durum)d=d.filter(r=>(r.durum||'taslak')===durum);
     const f=document.getElementById('araInput').value.toUpperCase();
     if(f)d=d.filter(r=>(r.dok_no||'').toUpperCase().includes(f)||(r.baslik||'').toUpperCase().includes(f));
     renderListe(d);
 }
-function ara(){uygulaFiltre()}
 
 async function listele(){
     const r=await fetch('/api/kalite-dokuman');
@@ -155,29 +190,168 @@ async function listele(){
 
 function renderListe(data){
     const tb=document.getElementById('liste');
-    if(!data.length){tb.innerHTML='<tr class="empty-row"><td colspan="8">Kayıt yok.</td></tr>';return}
+    if(!data.length){tb.innerHTML='<tr class="empty-row"><td colspan="9">Kayıt yok.</td></tr>';return}
     tb.innerHTML=data.map(r=>{
         const durum=r.durum||'taslak';
         const tar=r.yayin_tarihi?new Date(r.yayin_tarihi).toLocaleDateString('tr-TR'):'-';
-        return `<tr>
+        const revTar=r.gecerlilik_tarihi?new Date(r.gecerlilik_tarihi).toLocaleDateString('tr-TR'):'-';
+        const revSayisi = parseInt(r.revizyon_sayisi)||0;
+        return `<tr style="cursor:pointer" onclick="accordionToggle(${r.id},event)">
+            <td onclick="event.stopPropagation()"><input type="checkbox" class="dok-cb" value="${r.id}" onchange="checkboxDegis()"></td>
             <td style="font-weight:700;color:var(--primary)">${r.dok_no||'—'}</td>
             <td>${r.baslik}</td>
             <td>${r.tur||'—'}</td>
             <td>${r.revizyon_no||'—'}</td>
             <td>${tar}</td>
-            <td>${r.sorumlu||'—'}</td>
+            <td>${revTar}</td>
             <td><span class="badge ${DUR_RENK[durum]||''}">${DUR_LABEL[durum]||durum}</span></td>
-            <td>
+            <td onclick="event.stopPropagation()">
                 <div class="act-wrap" id="am-${r.id}">
                     <button class="act-btn" onclick="menuToggle(${r.id},event)">İşlemler ▾</button>
                     <div class="act-drop">
+                        <div class="act-drop-item" onclick="revizeModalAc(${r.id});menuKapat()">🔄 Revize Oluştur</div>
+                        <hr>
                         <div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>
                         <div class="act-drop-item danger" onclick="sil(${r.id});menuKapat()">🗑️ Sil</div>
                     </div>
                 </div>
             </td>
+        </tr>
+        <tr id="acc-${r.id}" style="display:none">
+            <td colspan="9" style="padding:0;background:#f8fafc">
+                <div id="acc-icerik-${r.id}" style="padding:12px 24px 16px"></div>
+            </td>
         </tr>`;
     }).join('');
+}
+
+async function accordionToggle(id, e) {
+    if(e.target.closest('.act-wrap')) return;
+    const row = document.getElementById('acc-'+id);
+    const icerik = document.getElementById('acc-icerik-'+id);
+    const acik = row.style.display !== 'none';
+    if(acik) { row.style.display='none'; return; }
+    icerik.innerHTML = '<div style="color:#64748b;font-size:0.83rem;padding:8px 0">⏳ Yükleniyor...</div>';
+    row.style.display = 'table-row';
+    const res = await fetch(`/api/kalite-dokuman/${id}/revizyonlar`);
+    const revizyonlar = await res.json();
+    if(!revizyonlar.length) {
+        icerik.innerHTML = '<div style="color:#94a3b8;font-size:0.83rem;padding:8px 0">Henüz revizyon yok.</div>';
+        return;
+    }
+    icerik.innerHTML = `
+        <div style="font-size:0.78rem;font-weight:700;color:#64748b;margin-bottom:8px">📋 Eski Revizyonlar</div>
+        <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+            <thead><tr style="background:#e2e8f0">
+                <th style="padding:7px 10px;text-align:left">Rev. No</th>
+                <th style="padding:7px 10px;text-align:left">Yayın Tarihi</th>
+                <th style="padding:7px 10px;text-align:left">Revizyon Tarihi</th>
+                <th style="padding:7px 10px;text-align:left">Durum</th>
+                <th style="padding:7px 10px;text-align:left">İşlemler</th>
+            </tr></thead>
+            <tbody>${revizyonlar.map(r=>{
+                const tar = r.yayin_tarihi?new Date(r.yayin_tarihi).toLocaleDateString('tr-TR'):'-';
+                const revTar = r.gecerlilik_tarihi?new Date(r.gecerlilik_tarihi).toLocaleDateString('tr-TR'):'-';
+                const durum = r.durum||'taslak';
+                return `<tr style="background:#fff;border-bottom:1px solid var(--border)">
+                    <td style="padding:7px 10px;font-weight:700;color:var(--primary)">${r.revizyon_no||'—'}</td>
+                    <td style="padding:7px 10px">${tar}</td>
+                    <td style="padding:7px 10px">${revTar}</td>
+                    <td style="padding:7px 10px"><span class="badge ${DUR_RENK[durum]||''}">${DUR_LABEL[durum]||durum}</span></td>
+                    <td style="padding:7px 10px">
+                        <div class="act-wrap" id="am-${r.id}">
+                            <button class="act-btn" onclick="menuToggle(${r.id},event)">İşlemler ▾</button>
+                            <div class="act-drop">
+                                <div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>
+                                <div class="act-drop-item danger" onclick="revSil(${r.id},${id});menuKapat()">🗑️ Sil</div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('')}</tbody>
+        </table>`;
+}
+
+function sonrakiRevNo(revNo) {
+    if(!revNo) return 'Rev.1';
+    const m = revNo.match(/(\d+)(?!.*\d)/);
+    if(!m) return revNo + '.1';
+    return revNo.slice(0, m.index) + (parseInt(m[0])+1);
+}
+
+function revizeModalAc(id) {
+    const dok = tumKayitlar.find(r=>r.id===id);
+    if(!dok) return;
+    document.getElementById('revize_parent_id').value = id;
+    document.getElementById('revize_rev_no').value = sonrakiRevNo(dok.revizyon_no);
+    document.getElementById('revize_tarih').value = new Date().toISOString().substring(0,10);
+    document.getElementById('revizeModal').classList.add('open');
+}
+function revizeModalKapat() { document.getElementById('revizeModal').classList.remove('open'); }
+
+async function revizeKaydet() {
+    const id = document.getElementById('revize_parent_id').value;
+    const revizyon_no = document.getElementById('revize_rev_no').value.trim();
+    const yayin_tarihi = document.getElementById('revize_tarih').value;
+    if(!revizyon_no) return showToast('❌ Revizyon no zorunludur!', true);
+    const btn = document.getElementById('revizeKaydetBtn');
+    btn.disabled=true; btn.textContent='Kaydediliyor...';
+    const res = await fetch(`/api/kalite-dokuman/${id}/revize`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({revizyon_no, yayin_tarihi})
+    });
+    if(res.ok) {
+        showToast('✅ Revizyon oluşturuldu!');
+        revizeModalKapat();
+        await listele();
+    } else showToast('❌ Hata oluştu!', true);
+    btn.disabled=false; btn.textContent='💾 Revize Kaydet';
+}
+
+async function revSil(revId, parentId) {
+    if(!await onayModal('Bu revizyonu silmek istediğinize emin misiniz?', true)) return;
+    const res = await fetch(`/api/kalite-dokuman/${revId}`, {method:'DELETE'});
+    if(res.ok) {
+        showToast('🗑️ Revizyon silindi!');
+        // Accordion'u kapat ve yeniden aç (güncelle)
+        const row = document.getElementById('acc-'+parentId);
+        row.style.display = 'none';
+        await accordionToggle(parentId, {target:document.createElement('div')});
+    } else showToast('❌ Silinemedi!', true);
+}
+
+function checkboxDegis(){
+    const secili=[...document.querySelectorAll('.dok-cb:checked')];
+    const bar=document.getElementById('topluBar');
+    if(secili.length>0){
+        bar.style.display='flex';
+        document.getElementById('topluSayiYazi').textContent=`${secili.length} kayıt seçildi`;
+    } else { bar.style.display='none'; }
+    const hepsi=document.querySelectorAll('.dok-cb');
+    const tumCB=document.getElementById('tumunuSecCB');
+    tumCB.checked=secili.length===hepsi.length&&hepsi.length>0;
+    tumCB.indeterminate=secili.length>0&&secili.length<hepsi.length;
+}
+
+function tumunuSec(cb){
+    document.querySelectorAll('.dok-cb').forEach(c=>c.checked=cb.checked);
+    checkboxDegis();
+}
+
+function secimiTemizle(){
+    document.querySelectorAll('.dok-cb').forEach(c=>c.checked=false);
+    document.getElementById('tumunuSecCB').checked=false;
+    document.getElementById('tumunuSecCB').indeterminate=false;
+    document.getElementById('topluBar').style.display='none';
+}
+
+async function topluSil(){
+    const ids=[...document.querySelectorAll('.dok-cb:checked')].map(c=>parseInt(c.value));
+    if(!ids.length)return;
+    if(!await onayModal(`Seçilen ${ids.length} doküman silinecek. Emin misiniz?`, true))return;
+    const res=await fetch('/api/kalite-dokuman-toplu-sil',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})});
+    if(res.ok){showToast(`🗑️ ${ids.length} doküman silindi.`);secimiTemizle();listele();}
+    else showToast('❌ Silinemedi!',true);
 }
 
 function menuToggle(id,e){
@@ -208,10 +382,9 @@ async function kaydet(){
         yayin_tarihi:document.getElementById('yayin_tarihi').value||null,
         gecerlilik_tarihi:document.getElementById('gecerlilik_tarihi').value||null,
         durum:document.getElementById('durum').value,
-        sorumlu:document.getElementById('sorumlu').value.trim(),
         aciklama:document.getElementById('aciklama').value.trim()
     };
-    if(!confirm(duzenleId?'Güncellemek istediğinize emin misiniz?':'Kaydetmek istediğinize emin misiniz?'))return;
+    if(!await onayModal(duzenleId?'Bu dokümanı güncellemek istediğinize emin misiniz?':'Bu dokümanı kaydetmek istediğinize emin misiniz?'))return;
     const btn=document.getElementById('saveBtn');btn.disabled=true;btn.textContent='Kaydediliyor...';
     const url=duzenleId?`/api/kalite-dokuman/${duzenleId}`:'/api/kalite-dokuman';
     const method=duzenleId?'PUT':'POST';
@@ -231,7 +404,6 @@ function duzenle(id){
     document.getElementById('yayin_tarihi').value=r.yayin_tarihi?r.yayin_tarihi.substring(0,10):'';
     document.getElementById('gecerlilik_tarihi').value=r.gecerlilik_tarihi?r.gecerlilik_tarihi.substring(0,10):'';
     document.getElementById('durum').value=r.durum||'taslak';
-    document.getElementById('sorumlu').value=r.sorumlu||'';
     document.getElementById('aciklama').value=r.aciklama||'';
     document.getElementById('saveBtn').textContent='💾 Güncelle';
     const c=document.getElementById('accContent');
@@ -242,13 +414,13 @@ function duzenle(id){
 }
 
 async function sil(id){
-    if(!confirm('Bu dokümanı silmek istediğinize emin misiniz?'))return;
+    if(!await onayModal('Bu dokümanı silmek istediğinize emin misiniz?', true))return;
     const res=await fetch(`/api/kalite-dokuman/${id}`,{method:'DELETE'});
     if(res.ok){showToast('🗑️ Silindi!');listele()}else showToast('❌ Silinemedi!',true);
 }
 
 function formTemizle(){
-    ['duzenle_id','dok_no','baslik','revizyon_no','yayin_tarihi','gecerlilik_tarihi','sorumlu','aciklama'].forEach(id=>document.getElementById(id).value='');
+    ['duzenle_id','dok_no','baslik','revizyon_no','yayin_tarihi','gecerlilik_tarihi','aciklama'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('tur').value='';
     document.getElementById('durum').value='taslak';
     document.getElementById('saveBtn').textContent='💾 Kaydet';
@@ -258,7 +430,219 @@ function formTemizle(){
 }
 
 listele();
+
+function onayModal(mesaj, tehlikeli=false){
+    return new Promise(resolve=>{
+        document.getElementById('onayMesaj').textContent=mesaj;
+        const evetBtn=document.getElementById('onayEvet');
+        evetBtn.className='onay-evet'+(tehlikeli?' danger':'');
+        evetBtn.textContent=tehlikeli?'🗑️ Sil':'✅ Evet, Devam Et';
+        document.getElementById('onayModal').classList.add('open');
+        const kapat=(sonuc)=>{
+            document.getElementById('onayModal').classList.remove('open');
+            resolve(sonuc);
+        };
+        document.getElementById('onayIptal').onclick=()=>kapat(false);
+        document.getElementById('onayEvet').onclick=()=>kapat(true);
+    });
+}
+
+// ── EXCEL IMPORT ──────────────────────────────────────────────
+let excelVerisi = [];
+
+function excelModalAc() {
+    excelVerisi = [];
+    document.getElementById('excelDosya').value = '';
+    document.getElementById('excelOnizle').style.display = 'none';
+    document.getElementById('importSonuc').style.display = 'none';
+    document.getElementById('dropZone').style.display = 'block';
+    document.getElementById('excelModal').classList.add('open');
+}
+function excelModalKapat() { document.getElementById('excelModal').classList.remove('open'); }
+
+function excelDrop(e) {
+    e.preventDefault();
+    document.getElementById('dropZone').classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) excelOku(file);
+}
+function excelSec(input) { if (input.files[0]) excelOku(input.files[0]); }
+
+function tarihDonustur(val) {
+    if (!val) return null;
+    if (typeof val === 'number') {
+        const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+        return d.toISOString().substring(0, 10);
+    }
+    const s = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    if (/^\d{2}\.\d{2}\.\d{4}$/.test(s)) { const [g,a,y]=s.split('.'); return `${y}-${a}-${g}`; }
+    return s || null;
+}
+
+function excelOku(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, { type: 'array', cellDates: false });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+            if (rows.length < 2) { alert('Excel boş veya yalnızca başlık satırı var.'); return; }
+            // A=dok_no B=baslik C=tur D=revizyon_no E=yayin_tarihi F=gecerlilik_tarihi G=durum H=aciklama
+            excelVerisi = [];
+            for (let i = 1; i < rows.length; i++) {
+                const r = rows[i];
+                const obj = {
+                    dok_no:             String(r[0]||'').trim()||null,
+                    baslik:             String(r[1]||'').trim(),
+                    tur:                String(r[2]||'').trim()||null,
+                    revizyon_no:        String(r[3]||'').trim()||null,
+                    yayin_tarihi:       tarihDonustur(r[4]),
+                    gecerlilik_tarihi:  tarihDonustur(r[5]),
+                    durum:              ({'yayında':'yayinda','yayinda':'yayinda','taslak':'taslak','iptal':'iptal','i̇ptal':'iptal'}[String(r[6]||'').trim().toLowerCase()])||'taslak',
+                    aciklama:           String(r[7]||'').trim()||null
+                };
+                if (obj.baslik) excelVerisi.push(obj);
+            }
+            document.getElementById('excelDosyaAdi').textContent = `📄 ${file.name}`;
+            document.getElementById('excelSatirSayisi').textContent = `${excelVerisi.length} kayıt bulundu`;
+            document.getElementById('excelOnizle').style.display = 'block';
+            document.getElementById('importSonuc').style.display = 'none';
+        } catch(err) { alert('Excel okunamadı: ' + err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+async function excelImport() {
+    if (!excelVerisi.length) return;
+    const btn = document.getElementById('excelImportBtn');
+    btn.disabled = true; btn.textContent = '⏳ Aktarılıyor...';
+    try {
+        const res = await fetch('/api/kalite-dokuman-toplu', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kayitlar: excelVerisi })
+        });
+        const sonuc = await res.json();
+        const wrap = document.getElementById('importSonuc');
+        wrap.style.display = 'block';
+        wrap.innerHTML = `
+            <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px 16px;font-size:0.85rem">
+                <div style="color:#166534;font-weight:700">✅ ${sonuc.basarili} kayıt başarıyla aktarıldı.</div>
+                ${sonuc.hatali > 0 ? `<div style="color:#92400e;margin-top:4px">⚠️ ${sonuc.hatali} kayıt aktarılamadı.</div>` : ''}
+                <div style="margin-top:10px"><button onclick="excelModalKapat();listele()" style="background:var(--primary);color:#fff;border:none;padding:9px 20px;border-radius:8px;font-weight:700;cursor:pointer">✅ Tamam, Listeyi Yenile</button></div>
+            </div>`;
+        document.getElementById('excelOnizle').style.display = 'none';
+        document.getElementById('dropZone').style.display = 'none';
+    } catch(e) { alert('Aktarım sırasında hata: ' + e.message); }
+    btn.disabled = false; btn.textContent = '⬆️ Sisteme Aktar';
+}
+
+function sablonIndir() {
+    const wb = XLSX.utils.book_new();
+    const ws_data = [
+        ['Doküman No','Başlık','Tür','Revizyon No','Yayın Tarihi','Revizyon Tarihi','Durum','Açıklama'],
+        ['KY-PR-001','Örnek Prosedür','Prosedür','Rev.0','2026-01-01','2027-01-01','yayinda','Kısa açıklama']
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    ws['!cols'] = Array(8).fill({ wch: 22 });
+    XLSX.utils.book_append_sheet(wb, ws, 'Dokümanlar');
+    XLSX.writeFile(wb, 'dokuman_sablon.xlsx');
+}
 </script>
+
+<!-- REVİZE MODAL -->
+<div id="revizeModal" class="modal-wrap">
+    <div style="background:#fff;border-radius:16px;width:94%;max-width:460px;">
+        <div style="padding:16px 24px;border-bottom:1px solid var(--border);background:#f8fafc;display:flex;justify-content:space-between;align-items:center;border-radius:16px 16px 0 0">
+            <span style="font-weight:700;color:var(--primary)">🔄 Revizyon Oluştur</span>
+            <button onclick="revizeModalKapat()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#64748b">✕</button>
+        </div>
+        <div style="padding:22px 24px">
+            <input type="hidden" id="revize_parent_id">
+            <div class="fg fg2" style="margin-bottom:14px">
+                <div>
+                    <label>Yeni Revizyon No</label>
+                    <input type="text" id="revize_rev_no" placeholder="Rev.1">
+                </div>
+                <div>
+                    <label>Yayın Tarihi</label>
+                    <input type="date" id="revize_tarih">
+                </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px">
+                <button onclick="revizeModalKapat()" style="background:#f1f5f9;color:#475569;border:none;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer">İptal</button>
+                <button class="btn-save" onclick="revizeKaydet()" id="revizeKaydetBtn">💾 Revize Kaydet</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- EXCEL IMPORT MODAL -->
+<div id="excelModal" style="display:none;position:fixed;inset:0;z-index:4000;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;" class="excelModalWrap">
+    <div style="background:#fff;border-radius:16px;width:94%;max-width:800px;max-height:92vh;overflow-y:auto;">
+        <div style="padding:16px 24px;border-bottom:1px solid var(--border);background:#f8fafc;display:flex;justify-content:space-between;align-items:center;border-radius:16px 16px 0 0;position:sticky;top:0;z-index:5;">
+            <span style="font-weight:700;color:var(--primary);font-size:0.97rem">📊 Excel ile Toplu Doküman Aktarımı</span>
+            <button onclick="excelModalKapat()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#64748b">✕</button>
+        </div>
+        <div style="padding:22px 24px;">
+            <div style="font-weight:700;color:var(--primary);font-size:0.87rem;margin-bottom:10px">📋 Excel Kolon Düzeni</div>
+            <p style="font-size:0.82rem;color:#64748b;margin:0 0 10px">Excel dosyanızın <strong>ilk satırı başlık satırı</strong> olmalıdır. Sütunlar sırasıyla şöyle olmalıdır:</p>
+            <table style="width:100%;border-collapse:collapse;font-size:0.83rem;margin-bottom:16px">
+                <thead><tr><th style="background:#1e40af;color:#fff;padding:9px 12px;text-align:left">Sütun</th><th style="background:#1e40af;color:#fff;padding:9px 12px;text-align:left">Alan Adı</th><th style="background:#1e40af;color:#fff;padding:9px 12px;text-align:left">Açıklama</th><th style="background:#1e40af;color:#fff;padding:9px 12px;text-align:left">Zorunlu</th></tr></thead>
+                <tbody>
+                    <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border)">A</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Doküman No</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Örn: KY-PR-001</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Hayır</td></tr>
+                    <tr style="background:#f8fafc"><td style="padding:8px 12px;border-bottom:1px solid var(--border)">B</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Başlık</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Doküman adı</td><td style="padding:8px 12px;border-bottom:1px solid var(--border);color:#dc2626;font-weight:700">Evet</td></tr>
+                    <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border)">C</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Tür</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Prosedür / Talimat / Form / El Kitabı / Diğer</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Hayır</td></tr>
+                    <tr style="background:#f8fafc"><td style="padding:8px 12px;border-bottom:1px solid var(--border)">D</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Revizyon No</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Örn: Rev.0</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Hayır</td></tr>
+                    <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border)">E</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Yayın Tarihi</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">YYYY-AA-GG veya GG.AA.YYYY</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Hayır</td></tr>
+                    <tr style="background:#f8fafc"><td style="padding:8px 12px;border-bottom:1px solid var(--border)">F</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Revizyon Tarihi</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">YYYY-AA-GG veya GG.AA.YYYY</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Hayır</td></tr>
+                    <tr><td style="padding:8px 12px;border-bottom:1px solid var(--border)">G</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Durum</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">taslak / yayinda / iptal</td><td style="padding:8px 12px;border-bottom:1px solid var(--border)">Hayır</td></tr>
+                    <tr style="background:#f8fafc"><td style="padding:8px 12px">H</td><td style="padding:8px 12px">Açıklama</td><td style="padding:8px 12px">Kısa açıklama metni</td><td style="padding:8px 12px">Hayır</td></tr>
+                </tbody>
+            </table>
+
+            <button onclick="sablonIndir()" style="background:#f0fdf4;color:#166534;border:1px solid #86efac;padding:9px 18px;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.84rem;margin-bottom:18px">📥 Boş Şablon İndir (.xlsx)</button>
+
+            <div id="dropZone" onclick="document.getElementById('excelDosya').click()"
+                ondragover="event.preventDefault();this.classList.add('dragover')"
+                ondragleave="this.classList.remove('dragover')"
+                ondrop="excelDrop(event)"
+                style="border:2px dashed #93c5fd;border-radius:12px;padding:32px;text-align:center;cursor:pointer;background:#f0f9ff;transition:0.2s">
+                <div style="font-size:2rem;margin-bottom:8px">📂</div>
+                <div style="font-weight:700;color:#1e40af;font-size:0.92rem">Excel dosyanızı buraya sürükleyin</div>
+                <div style="font-size:0.8rem;color:#64748b;margin-top:4px">veya tıklayarak seçin (.xlsx, .xls)</div>
+            </div>
+            <input type="file" id="excelDosya" accept=".xlsx,.xls" style="display:none" onchange="excelSec(this)">
+
+            <div id="excelOnizle" style="display:none;margin-top:14px">
+                <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:11px 16px;font-size:0.85rem;color:#1e40af;display:flex;justify-content:space-between;align-items:center">
+                    <span id="excelDosyaAdi"></span>
+                    <span id="excelSatirSayisi" style="font-weight:700"></span>
+                </div>
+                <div style="display:flex;justify-content:flex-end;margin-top:12px;gap:10px">
+                    <button onclick="excelModalKapat()" style="background:#f1f5f9;color:#475569;border:none;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer">İptal</button>
+                    <button onclick="excelImport()" id="excelImportBtn" style="background:linear-gradient(135deg,#1e3a8a,#1E40AF);color:#fff;border:none;padding:10px 22px;border-radius:8px;font-weight:700;cursor:pointer">⬆️ Sisteme Aktar</button>
+                </div>
+            </div>
+            <div id="importSonuc" style="display:none;margin-top:14px"></div>
+        </div>
+    </div>
+</div>
+
+<div id="onayModal">
+    <div class="onay-box">
+        <div class="onay-icon">⚠️</div>
+        <div class="onay-mesaj" id="onayMesaj"></div>
+        <div class="onay-btns">
+            <button class="onay-iptal" id="onayIptal">İptal</button>
+            <button class="onay-evet" id="onayEvet">✅ Evet, Devam Et</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="sort-utils.js"></script>
 </body>
 </html>

@@ -54,8 +54,25 @@ async function r2Yukle(key, buffer) {
 async function r2Indir(key) {
     return await r2Request('GET', key, null);
 }
+const puppeteer = require('puppeteer-core');
 const QRCode    = require('qrcode');
-const { PDFDocument } = require('pdf-lib');
+
+function chromiumExecPath() {
+    if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH;
+    const candidates = [
+        '/nix/var/nix/profiles/default/bin/chromium',
+        '/run/current-system/sw/bin/chromium',
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+    ];
+    const found = candidates.find(p => { try { require('fs').accessSync(p); return true; } catch(e) { return false; } });
+    if (found) return found;
+    try { return require('child_process').execSync('which chromium || which chromium-browser || which google-chrome 2>/dev/null', { timeout: 3000 }).toString().trim(); }
+    catch(e) { return 'chromium'; }
+}
+const { PDFDocument, StandardFonts, rgb, degrees } = require('pdf-lib');
 const { Pool } = require('pg');
 const path = require('path');
 const cors = require('cors');
@@ -75,6 +92,82 @@ const pool = new Pool({
 });
 
 // TEST YOLU
+// Test: ölçüm PDF footer - ?id=SERTIFIKA_ID ile çağır
+app.get('/api/test-footer', async (req, res) => {
+    let browser;
+    try {
+        const id = req.params.id || req.query.id;
+        if (!id) return res.status(400).send('?id=SERTIFIKA_ID parametresi gerekli');
+
+        const row = await pool.query('SELECT olcum_pdf_url FROM sertifikalar WHERE id=$1', [id]);
+        if (!row.rows.length || !row.rows[0].olcum_pdf_url)
+            return res.status(404).send('Ölçüm PDF bulunamadı');
+
+        const olcumBytes = Buffer.from(row.rows[0].olcum_pdf_url, 'base64');
+
+        const ayarRows = await pool.query('SELECT anahtar, deger FROM ayarlar');
+        const ayar = ayarRows.rows.reduce((o, r) => { o[r.anahtar] = r.deger; return o; }, {});
+        const labAdi   = ayar.lab_adi   || 'LAB ADI';
+        const labAdres = ayar.adres     || '';
+        const labTel   = ayar.telefon   || '';
+        const labWeb   = ayar.website   || '';
+        const labMail  = ayar.email     || '';
+
+        browser = await puppeteer.launch({
+            executablePath: chromiumExecPath(),
+            headless: 'new',
+            args: ['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage','--disable-gpu','--no-zygote','--single-process'],
+        });
+
+        const footerHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+        <style>*{margin:0;padding:0;box-sizing:border-box}
+        body{width:794px;height:72px;background:white;font-family:Arial,sans-serif;padding:4px 15px 2px}
+        .line1{border-top:0.6px solid #aaa;padding-top:3px;display:flex;justify-content:space-between;font-size:7px;color:#555}
+        .line2{border-top:0.3px solid #ccc;margin-top:3px;padding-top:2px;font-size:6px;color:#555;line-height:1.45}
+        </style></head><body>
+        <div class="line1"><span>${labAdi}  ${labAdres}</span><span>${[labTel?'Tel: '+labTel:'',labWeb,labMail].filter(Boolean).join('  |  ')}</span></div>
+        <div class="line2">
+          Bu sertifika, laboratuvarin yazili izni olmadan kismen kopyalanip cogaltilamaz. | Imzasiz ve TURKAK Dogrulama Kare Kodu bulunmayan sertifikalar gecersizdir.<br>
+          Bu sertifikanin kullanimindan once asist.turkak.org.tr uzerinden kare kodu okutarak dogrulayiniz.<br>
+          This certificate shall not be reproduced other than in full except with the permission of the laboratory. | Certificates unsigned or without TURKAK QR code are invalid.<br>
+          Before using this certificate, verify it by scanning the QR code via asist.turkak.org.tr.
+        </div></body></html>`;
+
+        const footerPage = await browser.newPage();
+        await footerPage.setViewport({ width: 794, height: 72 });
+        await footerPage.setContent(footerHtml, { waitUntil: 'networkidle0' });
+        const footerBuffer = await footerPage.pdf({
+            width: '794px', height: '72px',
+            margin: { top: '0', right: '0', bottom: '0', left: '0' },
+            printBackground: true,
+        });
+        await browser.close(); browser = null;
+
+        const { PDFDocument } = require('pdf-lib');
+        const sonDoc = await PDFDocument.create();
+        const [embFooter] = await sonDoc.embedPdf(footerBuffer, [0]);
+        const embOlcumPages = await sonDoc.embedPdf(olcumBytes);
+        const pageW = 595.28, pageH = 841.89;
+        const footerH = 72 * (pageH / 1122.52);
+
+        for (const embOlcum of embOlcumPages) {
+            const pg = sonDoc.addPage([pageW, pageH]);
+            const { width: oW, height: oH } = embOlcum;
+            const scale = Math.min(pageW / oW, (pageH - footerH) / oH);
+            pg.drawPage(embOlcum, { x: (pageW - oW*scale)/2, y: footerH, width: oW*scale, height: oH*scale });
+            pg.drawPage(embFooter, { x: 0, y: 0, width: pageW, height: footerH });
+        }
+
+        const pdfBytes = await sonDoc.save();
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline; filename="test-footer.pdf"');
+        res.send(Buffer.from(pdfBytes));
+    } catch(err) {
+        if(browser) try { await browser.close(); } catch(e) {}
+        res.status(500).send('HATA: ' + err.message + '\n' + err.stack);
+    }
+});
+
 app.get('/api/test', async (req, res) => {
     try {
         const result = await pool.query('SELECT NOW()');
@@ -1094,7 +1187,7 @@ app.delete('/api/is-emirleri/:id', async (req, res) => {
 // --- DASHBOARD İSTATİSTİKLERİ ---
 app.get('/api/dashboard', async (req, res) => {
     try {
-        const [kabulEdilenler, hazırlananlar, tamamlananlar, buYil, musteriler, referanslar, takvimleri] = await Promise.all([
+        const [kabulEdilenler, hazırlananlar, tamamlananlar, buYil, musteriler, referanslar, takvimleri, revizyonlar] = await Promise.all([
             pool.query(`SELECT COUNT(*) FROM is_emirleri WHERE asama='kabul_edildi'`),
             pool.query(`SELECT COUNT(*) FROM is_emirleri WHERE asama IN ('hazırlanıyor','tamamlandı','imzalandı')`),
             pool.query(`SELECT COUNT(*) FROM is_emirleri WHERE asama='onaylandı' OR asama='sertifika_gönderildi'`),
@@ -1118,7 +1211,16 @@ app.get('/api/dashboard', async (req, res) => {
                 FROM takvim t
                 LEFT JOIN personeller p ON t.atanan_id = p.id
                 WHERE t.baslangic = CURRENT_DATE + INTERVAL '1 day'
-                ORDER BY t.baslangic ASC`)
+                ORDER BY t.baslangic ASC`),
+            // Son 30 günde revize edilen dokümanlar
+            pool.query(`
+                SELECT p.baslik, p.dok_no, p.revizyon_no, p.gecerlilik_tarihi as revizyon_tarihi
+                FROM kalite_dokuman p
+                WHERE p.parent_id IS NULL
+                AND p.gecerlilik_tarihi >= CURRENT_DATE - INTERVAL '7 days'
+                AND EXISTS (SELECT 1 FROM kalite_dokuman c WHERE c.parent_id = p.id)
+                ORDER BY p.gecerlilik_tarihi DESC
+                LIMIT 10`)
         ]);
         res.json({
             kabul_edildi: parseInt(kabulEdilenler.rows[0].count),
@@ -1127,7 +1229,8 @@ app.get('/api/dashboard', async (req, res) => {
             bu_yil: parseInt(buYil.rows[0].count),
             musteri_sayisi: parseInt(musteriler.rows[0].count),
             yaklasan_aktiviteler: referanslar.rows,
-            yaklasan_etkinlikler: takvimleri.rows
+            yaklasan_etkinlikler: takvimleri.rows,
+            son_revizyonlar: revizyonlar.rows
         });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1370,9 +1473,72 @@ async function createKaliteTables() {
     console.log('✅ Kalite sistemi tabloları hazır.');
 }
 
+// ── GROQ AI ASISTAN ──
+app.post('/api/ai/sor', async (req, res) => {
+    const { mesaj, gecmis = [] } = req.body;
+    if (!mesaj) return res.status(400).json({ hata: 'Mesaj boş olamaz.' });
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) return res.status(500).json({ hata: 'GROQ_API_KEY tanımlı değil.' });
+
+    const sistem = `Sen LabQMS Pro adlı laboratuvar kalite yönetim sisteminin yapay zeka asistanısın.
+Kullanıcılar laboratuvar kalite yönetimi, ISO 17025, kalibrasyon, uygunsuzluk, DÖF (Düzeltici ve Önleyici Faaliyet),
+doküman yönetimi, sertifika süreçleri gibi konularda sana soru sorabilir.
+Kısa, net ve pratik cevaplar ver. Türkçe konuş.`;
+
+    const mesajlar = [
+        { role: 'system', content: sistem },
+        ...gecmis.slice(-6),
+        { role: 'user', content: mesaj }
+    ];
+
+    const body = JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: mesajlar,
+        max_tokens: 1024,
+        temperature: 0.7
+    });
+
+    const options = {
+        hostname: 'api.groq.com',
+        path: '/openai/v1/chat/completions',
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Length': Buffer.byteLength(body)
+        }
+    };
+
+    const apiReq = https.request(options, (apiRes) => {
+        let data = '';
+        apiRes.on('data', chunk => data += chunk);
+        apiRes.on('end', () => {
+            try {
+                const parsed = JSON.parse(data);
+                const cevap = parsed.choices?.[0]?.message?.content;
+                if (cevap) res.json({ cevap });
+                else res.status(500).json({ hata: 'Yanıt alınamadı.', detay: data });
+            } catch(e) { res.status(500).json({ hata: 'Parse hatası.' }); }
+        });
+    });
+    apiReq.on('error', e => res.status(500).json({ hata: e.message }));
+    apiReq.write(body);
+    apiReq.end();
+});
+
 app.listen(PORT, async () => {
     console.log(`🚀 Sunucu ${PORT} portunda başarıyla ayağa kalktı.`);
     await createKaliteTables().catch(e => console.error('Tablo oluşturma hatası:', e.message));
+    // Türkçe karakter normalizasyonu: "yayında" → "yayinda", "i̇ptal" → "iptal"
+    await pool.query(`UPDATE kalite_dokuman SET durum='yayinda' WHERE durum='yayında'`).catch(()=>{});
+    await pool.query(`UPDATE kalite_dokuman SET durum='iptal' WHERE durum='i̇ptal'`).catch(()=>{});
+    // Revizyon yapısı için parent_id kolonu ekle
+    await pool.query(`ALTER TABLE kalite_dokuman ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES kalite_dokuman(id) ON DELETE CASCADE`).catch(()=>{});
+    // Uygunsuzluk yeni alanlar
+    await pool.query(`ALTER TABLE uygunsuzluk ADD COLUMN IF NOT EXISTS esas_alinan_sart TEXT`).catch(()=>{});
+    await pool.query(`ALTER TABLE uygunsuzluk ADD COLUMN IF NOT EXISTS sinif VARCHAR(20)`).catch(()=>{});
+    await pool.query(`ALTER TABLE dof ADD COLUMN IF NOT EXISTS kapsam_etki TEXT`).catch(()=>{});
+    await pool.query(`ALTER TABLE dof ADD COLUMN IF NOT EXISTS yayilma_etki TEXT`).catch(()=>{});
 });
 
 // ─── KALİTE SİSTEMİ API ROTALARI ────────────────────────────────────────────
@@ -1380,29 +1546,88 @@ app.listen(PORT, async () => {
 // --- DOKÜMAN YÖNETİMİ ---
 app.get('/api/kalite-dokuman', async (req, res) => {
     try {
-        const r = await pool.query('SELECT * FROM kalite_dokuman ORDER BY olusturma_tarihi DESC');
+        const r = await pool.query(`
+            SELECT d.*,
+                (SELECT COUNT(*) FROM kalite_dokuman r WHERE r.parent_id = d.id) AS revizyon_sayisi
+            FROM kalite_dokuman d
+            WHERE d.parent_id IS NULL
+            ORDER BY d.olusturma_tarihi DESC`);
         res.json(r.rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/kalite-dokuman/:id/revizyonlar', async (req, res) => {
+    try {
+        const r = await pool.query(
+            'SELECT * FROM kalite_dokuman WHERE parent_id=$1 ORDER BY olusturma_tarihi ASC',
+            [req.params.id]
+        );
+        res.json(r.rows);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/kalite-dokuman/:id/revize', async (req, res) => {
+    try {
+        const parent = await pool.query('SELECT * FROM kalite_dokuman WHERE id=$1', [req.params.id]);
+        if (!parent.rows.length) return res.status(404).json({ error: 'Doküman bulunamadı' });
+        const p = parent.rows[0];
+        const { revizyon_no, yayin_tarihi } = req.body;
+        // Eski veriyi alt kayıt olarak iptal durumunda kaydet
+        await pool.query(
+            `INSERT INTO kalite_dokuman (dok_no,baslik,tur,revizyon_no,yayin_tarihi,gecerlilik_tarihi,durum,aciklama,parent_id)
+             VALUES ($1,$2,$3,$4,$5,$6,'iptal',$7,$8)`,
+            [p.dok_no, p.baslik, p.tur, p.revizyon_no, p.yayin_tarihi||null, p.gecerlilik_tarihi||null, p.aciklama, p.id]
+        );
+        // Ana kaydı yeni revizyon no ve revizyon tarihiyle güncelle
+        const r = await pool.query(
+            `UPDATE kalite_dokuman SET revizyon_no=$1, gecerlilik_tarihi=$2 WHERE id=$3 RETURNING *`,
+            [revizyon_no, yayin_tarihi||null, p.id]
+        );
+        res.json(r.rows[0]);
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.post('/api/kalite-dokuman', async (req, res) => {
     try {
-        const { dok_no, baslik, tur, revizyon_no, yayin_tarihi, gecerlilik_tarihi, durum, sorumlu, aciklama } = req.body;
+        const { dok_no, baslik, tur, revizyon_no, yayin_tarihi, gecerlilik_tarihi, durum, aciklama } = req.body;
         const r = await pool.query(
-            `INSERT INTO kalite_dokuman (dok_no,baslik,tur,revizyon_no,yayin_tarihi,gecerlilik_tarihi,durum,sorumlu,aciklama)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-            [dok_no, baslik, tur, revizyon_no, yayin_tarihi||null, gecerlilik_tarihi||null, durum||'taslak', sorumlu, aciklama]
+            `INSERT INTO kalite_dokuman (dok_no,baslik,tur,revizyon_no,yayin_tarihi,gecerlilik_tarihi,durum,aciklama)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+            [dok_no, baslik, tur, revizyon_no, yayin_tarihi||null, gecerlilik_tarihi||null, durum||'taslak', aciklama]
         );
         res.json(r.rows[0]);
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.put('/api/kalite-dokuman/:id', async (req, res) => {
     try {
-        const { dok_no, baslik, tur, revizyon_no, yayin_tarihi, gecerlilik_tarihi, durum, sorumlu, aciklama } = req.body;
+        const { dok_no, baslik, tur, revizyon_no, yayin_tarihi, gecerlilik_tarihi, durum, aciklama } = req.body;
         const r = await pool.query(
-            `UPDATE kalite_dokuman SET dok_no=$1,baslik=$2,tur=$3,revizyon_no=$4,yayin_tarihi=$5,gecerlilik_tarihi=$6,durum=$7,sorumlu=$8,aciklama=$9 WHERE id=$10 RETURNING *`,
-            [dok_no, baslik, tur, revizyon_no, yayin_tarihi||null, gecerlilik_tarihi||null, durum, sorumlu, aciklama, req.params.id]
+            `UPDATE kalite_dokuman SET dok_no=$1,baslik=$2,tur=$3,revizyon_no=$4,yayin_tarihi=$5,gecerlilik_tarihi=$6,durum=$7,aciklama=$8 WHERE id=$9 RETURNING *`,
+            [dok_no, baslik, tur, revizyon_no, yayin_tarihi||null, gecerlilik_tarihi||null, durum, aciklama, req.params.id]
         );
         res.json(r.rows[0]);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/kalite-dokuman-toplu', async (req, res) => {
+    try {
+        const { kayitlar } = req.body;
+        let basarili = 0, hatali = 0, hatalar = [];
+        for (const k of kayitlar) {
+            try {
+                if (!k.baslik) { hatalar.push(`Başlık boş: ${JSON.stringify(k)}`); hatali++; continue; }
+                await pool.query(
+                    `INSERT INTO kalite_dokuman (dok_no,baslik,tur,revizyon_no,yayin_tarihi,gecerlilik_tarihi,durum,aciklama)
+                     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+                    [k.dok_no||null, k.baslik, k.tur||null, k.revizyon_no||null, k.yayin_tarihi||null, k.gecerlilik_tarihi||null, k.durum||'taslak', k.aciklama||null]
+                );
+                basarili++;
+            } catch(e) { hatalar.push(k.baslik + ': ' + e.message); hatali++; }
+        }
+        res.json({ basarili, hatali, hatalar });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+app.delete('/api/kalite-dokuman-toplu-sil', async (req, res) => {
+    try {
+        const { ids } = req.body;
+        await pool.query('DELETE FROM kalite_dokuman WHERE id=ANY($1)', [ids]);
+        res.json({ success: true });
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.delete('/api/kalite-dokuman/:id', async (req, res) => {
@@ -1421,21 +1646,21 @@ app.get('/api/uygunsuzluk', async (req, res) => {
 });
 app.post('/api/uygunsuzluk', async (req, res) => {
     try {
-        const { kayit_no, tarih, kaynak, aciklama, tespit_eden, durum, kapatis_tarihi } = req.body;
+        const { kayit_no, tarih, kaynak, aciklama, tespit_eden, durum, kapatis_tarihi, esas_alinan_sart, sinif } = req.body;
         const r = await pool.query(
-            `INSERT INTO uygunsuzluk (kayit_no,tarih,kaynak,aciklama,tespit_eden,durum,kapatis_tarihi)
-             VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-            [kayit_no, tarih||null, kaynak, aciklama, tespit_eden, durum||'acik', kapatis_tarihi||null]
+            `INSERT INTO uygunsuzluk (kayit_no,tarih,kaynak,aciklama,tespit_eden,durum,kapatis_tarihi,esas_alinan_sart,sinif)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+            [kayit_no, tarih||null, kaynak, aciklama, tespit_eden, durum||'acik', kapatis_tarihi||null, esas_alinan_sart||null, sinif||null]
         );
         res.json(r.rows[0]);
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.put('/api/uygunsuzluk/:id', async (req, res) => {
     try {
-        const { kayit_no, tarih, kaynak, aciklama, tespit_eden, durum, kapatis_tarihi } = req.body;
+        const { kayit_no, tarih, kaynak, aciklama, tespit_eden, durum, kapatis_tarihi, esas_alinan_sart, sinif } = req.body;
         const r = await pool.query(
-            `UPDATE uygunsuzluk SET kayit_no=$1,tarih=$2,kaynak=$3,aciklama=$4,tespit_eden=$5,durum=$6,kapatis_tarihi=$7 WHERE id=$8 RETURNING *`,
-            [kayit_no, tarih||null, kaynak, aciklama, tespit_eden, durum, kapatis_tarihi||null, req.params.id]
+            `UPDATE uygunsuzluk SET kayit_no=$1,tarih=$2,kaynak=$3,aciklama=$4,tespit_eden=$5,durum=$6,kapatis_tarihi=$7,esas_alinan_sart=$8,sinif=$9 WHERE id=$10 RETURNING *`,
+            [kayit_no, tarih||null, kaynak, aciklama, tespit_eden, durum, kapatis_tarihi||null, esas_alinan_sart||null, sinif||null, req.params.id]
         );
         res.json(r.rows[0]);
     } catch(e) { res.status(500).json({ error: e.message }); }
@@ -1456,21 +1681,21 @@ app.get('/api/dof/:uygunsuzluk_id', async (req, res) => {
 });
 app.post('/api/dof', async (req, res) => {
     try {
-        const { uygunsuzluk_id, kok_neden, faaliyet_tanimi, sorumlu, termin, tamamlandi_tarihi, sonuc } = req.body;
+        const { uygunsuzluk_id, kok_neden, kapsam_etki, yayilma_etki, faaliyet_tanimi, sorumlu, termin, tamamlandi_tarihi, sonuc } = req.body;
         const r = await pool.query(
-            `INSERT INTO dof (uygunsuzluk_id,kok_neden,faaliyet_tanimi,sorumlu,termin,tamamlandi_tarihi,sonuc)
-             VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-            [uygunsuzluk_id, kok_neden, faaliyet_tanimi, sorumlu, termin||null, tamamlandi_tarihi||null, sonuc]
+            `INSERT INTO dof (uygunsuzluk_id,kok_neden,kapsam_etki,yayilma_etki,faaliyet_tanimi,sorumlu,termin,tamamlandi_tarihi,sonuc)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+            [uygunsuzluk_id, kok_neden, kapsam_etki, yayilma_etki, faaliyet_tanimi, sorumlu, termin||null, tamamlandi_tarihi||null, sonuc]
         );
         res.json(r.rows[0]);
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 app.put('/api/dof/:id', async (req, res) => {
     try {
-        const { kok_neden, faaliyet_tanimi, sorumlu, termin, tamamlandi_tarihi, sonuc } = req.body;
+        const { kok_neden, kapsam_etki, yayilma_etki, faaliyet_tanimi, sorumlu, termin, tamamlandi_tarihi, sonuc } = req.body;
         const r = await pool.query(
-            `UPDATE dof SET kok_neden=$1,faaliyet_tanimi=$2,sorumlu=$3,termin=$4,tamamlandi_tarihi=$5,sonuc=$6 WHERE id=$7 RETURNING *`,
-            [kok_neden, faaliyet_tanimi, sorumlu, termin||null, tamamlandi_tarihi||null, sonuc, req.params.id]
+            `UPDATE dof SET kok_neden=$1,kapsam_etki=$2,yayilma_etki=$3,faaliyet_tanimi=$4,sorumlu=$5,termin=$6,tamamlandi_tarihi=$7,sonuc=$8 WHERE id=$9 RETURNING *`,
+            [kok_neden, kapsam_etki, yayilma_etki, faaliyet_tanimi, sorumlu, termin||null, tamamlandi_tarihi||null, sonuc, req.params.id]
         );
         res.json(r.rows[0]);
     } catch(e) { res.status(500).json({ error: e.message }); }
@@ -2099,9 +2324,9 @@ app.get('/api/sertifikalar/:id/pdf', async (req, res) => {
         // S1+S2 HTML → PDF (Puppeteer)
         const onizleUrl = `${req.protocol}://${req.get('host')}/sertifika-onizle.html?id=${req.params.id}&print=1`;
         // Railway'de sistem Chromium'unu kullan
-        const execPath = process.env.CHROMIUM_PATH || 
+        const execPath = process.env.CHROMIUM_PATH ||
             require('child_process').execSync('which chromium || which chromium-browser || which google-chrome || echo ""')
-            .toString().trim() || await chromium.executablePath();
+            .toString().trim();
 
         browser = await puppeteer.launch({
             executablePath: execPath,
@@ -2129,6 +2354,40 @@ app.get('/api/sertifikalar/:id/pdf', async (req, res) => {
             printBackground: true,
             preferCSSPageSize: true,
         });
+
+        // Lab ayarlarını çek (footer için - browser açıkken)
+        const ayarRows = await pool.query('SELECT anahtar, deger FROM ayarlar');
+        const ayar = ayarRows.rows.reduce((o, r) => { o[r.anahtar] = r.deger; return o; }, {});
+        const labAdi   = ayar.lab_adi   || '';
+        const labAdres = ayar.adres     || ayar.lab_adres || '';
+        const labTel   = ayar.telefon   || ayar.lab_tel   || '';
+        const labWeb   = ayar.website   || ayar.lab_web   || '';
+        const labMail  = ayar.email     || ayar.lab_mail  || '';
+
+        // Footer HTML → PDF (Puppeteer ile, browser hâlâ açık)
+        const footerHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+        <style>*{margin:0;padding:0;box-sizing:border-box}
+        body{width:794px;height:72px;background:white;font-family:Arial,sans-serif;padding:4px 15px 2px}
+        .line1{border-top:0.6px solid #aaa;padding-top:3px;display:flex;justify-content:space-between;font-size:7px;color:#555}
+        .line2{border-top:0.3px solid #ccc;margin-top:3px;padding-top:2px;font-size:6px;color:#555;line-height:1.45}
+        </style></head><body>
+        <div class="line1"><span>${labAdi}  ${labAdres}</span><span>${[labTel?'Tel: '+labTel:'',labWeb,labMail].filter(Boolean).join('  |  ')}</span></div>
+        <div class="line2">
+          Bu sertifika, laboratuvarin yazili izni olmadan kismen kopyalanip cogaltilamaz. | Imzasiz ve TURKAK Dogrulama Kare Kodu bulunmayan sertifikalar gecersizdir.<br>
+          Bu sertifikanin kullanimindan once asist.turkak.org.tr uzerinden kare kodu okutarak dogrulayiniz.<br>
+          This certificate shall not be reproduced other than in full except with the permission of the laboratory. | Certificates unsigned or without TURKAK QR code are invalid.<br>
+          Before using this certificate, verify it by scanning the QR code via asist.turkak.org.tr.
+        </div></body></html>`;
+
+        const footerPage = await browser.newPage();
+        await footerPage.setViewport({ width: 794, height: 72 });
+        await footerPage.setContent(footerHtml, { waitUntil: 'networkidle0' });
+        const footerBuffer = await footerPage.pdf({
+            width: '794px', height: '72px',
+            margin: { top: '0', right: '0', bottom: '0', left: '0' },
+            printBackground: true,
+        });
+
         await browser.close();
         browser = null;
 
@@ -2144,10 +2403,29 @@ app.get('/api/sertifikalar/:id/pdf', async (req, res) => {
             const s1s2Pages = await birlesikDoc.copyPages(s1s2Doc, s1s2Doc.getPageIndices());
             s1s2Pages.forEach(p => birlesikDoc.addPage(p));
 
-            // Ölçüm PDF sayfaları ekle
-            const olcumDoc = await PDFDocument.load(olcumBytes);
-            const olcumPages = await birlesikDoc.copyPages(olcumDoc, olcumDoc.getPageIndices());
-            olcumPages.forEach(p => birlesikDoc.addPage(p));
+            // Footer PDF'ini XObject olarak göm
+            const [embFooter] = await birlesikDoc.embedPdf(footerBuffer, [0]);
+            const footerH = 72 * (841.89 / 1122.52); // px → pt (A4 oranı)
+
+            // Ölçüm sayfalarını yeni A4 sayfalara XObject olarak yerleştir
+            const embOlcumPages = await birlesikDoc.embedPdf(olcumBytes);
+            const pageW = 595.28, pageH = 841.89;
+            const copiedPages = []; // compat
+
+            // Her ölçüm sayfasını yeni A4'e XObject(ölçüm) + XObject(footer) olarak yerleştir
+            for (const embOlcum of embOlcumPages) {
+                const newPage = birlesikDoc.addPage([pageW, pageH]);
+                const contentH = pageH - footerH;
+                const { width: oW, height: oH } = embOlcum;
+                const scale = Math.min(pageW / oW, contentH / oH);
+                const scaledW = oW * scale;
+                const scaledH = oH * scale;
+                const xOff = (pageW - scaledW) / 2;
+                // Ölçüm içeriği - üst alana
+                newPage.drawPage(embOlcum, { x: xOff, y: footerH, width: scaledW, height: scaledH });
+                // Footer - alt alana (Puppeteer ile render edilmiş HTML)
+                newPage.drawPage(embFooter, { x: 0, y: 0, width: pageW, height: footerH });
+            }
 
             const birlesikBytes = await birlesikDoc.save();
             sonPdfBuffer = Buffer.from(birlesikBytes);
@@ -2178,8 +2456,8 @@ app.get('/api/sertifikalar/:id/pdf', async (req, res) => {
 app.get('/api/sertifikalar/:id/qr', async (req, res) => {
     try {
         const host = `${req.protocol}://${req.get('host')}`;
-        // QR → direkt PDF indir
-        const url  = `${host}/api/sertifikalar/${req.params.id}/pdf`;
+        // QR → onaylanan/imzalı PDF'i aç
+        const url  = `${host}/api/sertifikalar/${req.params.id}/onaylanan-pdf`;
         const qrDataUrl = await QRCode.toDataURL(url, {
             width: 120, margin: 1,
             color: { dark: '#000000', light: '#ffffff' }
@@ -2522,6 +2800,26 @@ try {
     } catch(err){
         console.error("Türkak işlem hatası:",err);
         res.status(500).json({ error: err.message });
+    }
+});
+
+// Onaylanan PDF'i tarayıcıda aç (QR linki)
+app.get('/api/sertifikalar/:id/onaylanan-pdf', async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT sertifika_pdf, sertifika_no, asama FROM sertifikalar WHERE id=$1',
+            [req.params.id]
+        );
+        if (!result.rows.length) return res.status(404).send('Sertifika bulunamadı');
+        const s = result.rows[0];
+        if (!s.sertifika_pdf) return res.status(404).send('Onaylanan PDF henüz yok');
+        const buffer = await r2Indir(s.sertifika_pdf);
+        const dosyaAdi = `sertifika_${s.sertifika_no || req.params.id}.pdf`;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${dosyaAdi}"`);
+        res.send(buffer);
+    } catch(err) {
+        res.status(500).send(err.message);
     }
 });
 

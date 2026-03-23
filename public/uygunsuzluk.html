@@ -6,6 +6,15 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{--primary:#1E40AF;--border:#e2e8f0;--bg:#f8fafc;--success:#10B981;--text:#334155}
+#onayModal{display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);align-items:center;justify-content:center}
+#onayModal.open{display:flex!important}
+.onay-box{background:#fff;border-radius:16px;padding:28px 32px;width:92%;max-width:400px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2)}
+.onay-icon{font-size:2.4rem;margin-bottom:10px}
+.onay-mesaj{font-size:0.95rem;color:var(--text);margin-bottom:20px;font-weight:500;line-height:1.5}
+.onay-btns{display:flex;gap:10px;justify-content:center}
+.onay-iptal{background:#f1f5f9;color:#475569;border:none;padding:10px 24px;border-radius:9px;font-weight:600;cursor:pointer;font-size:0.9rem}
+.onay-evet{background:linear-gradient(135deg,#1e3a8a,#1E40AF);color:#fff;border:none;padding:10px 24px;border-radius:9px;font-weight:700;cursor:pointer;font-size:0.9rem}
+.onay-evet.danger{background:linear-gradient(135deg,#991b1b,#dc2626)}
 *{box-sizing:border-box}
 body{font-family:'Inter',sans-serif;background:var(--bg);padding:24px;color:var(--text);margin:0}
 .accordion{background:#fff;border-radius:12px;border:1px solid var(--border);overflow:hidden;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
@@ -51,6 +60,16 @@ td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.85rem;ver
 .kol.aktif{border-color:var(--primary);background:#eff6ff;transform:translateY(-3px);box-shadow:0 4px 14px rgba(30,64,175,0.15)}
 .kol-sayi{font-size:1.4rem;font-weight:800;color:var(--primary)}
 .kol-label{font-size:0.72rem;font-weight:700;color:#64748b;margin-top:2px}
+/* GÖRÜNTÜLE PANEL */
+#goruntulePanel{display:none;position:fixed;inset:0;z-index:4000;background:rgba(0,0,0,0.5);align-items:center;justify-content:center}
+#goruntulePanel.open{display:flex}
+.gor-box{background:#fff;border-radius:14px;width:92%;max-width:640px;max-height:90vh;overflow-y:auto}
+.gor-head{padding:16px 22px;border-bottom:1px solid var(--border);background:#f8fafc;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:5;border-radius:14px 14px 0 0}
+.gor-body{padding:20px 22px}
+.gor-row{display:grid;grid-template-columns:140px 1fr;gap:8px;padding:9px 0;border-bottom:1px solid #f1f5f9;font-size:0.87rem}
+.gor-row:last-child{border-bottom:none}
+.gor-lbl{font-weight:700;color:#64748b;font-size:0.78rem}
+.gor-val{color:var(--text);word-break:break-word;line-height:1.55}
 /* DÖF PANEL */
 #dofPanel{display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.5);align-items:center;justify-content:center}
 #dofPanel.open{display:flex}
@@ -64,6 +83,17 @@ td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.85rem;ver
 </head>
 <body>
 <div id="toast"></div>
+
+<!-- GÖRÜNTÜLE PANEL -->
+<div id="goruntulePanel">
+    <div class="gor-box">
+        <div class="gor-head">
+            <span style="font-weight:700;color:var(--primary);font-size:0.95rem">👁️ Uygunsuzluk Detayı</span>
+            <button onclick="goruntuleKapat()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#64748b">✕</button>
+        </div>
+        <div class="gor-body" id="goruntuleIcerik"></div>
+    </div>
+</div>
 
 <!-- DÖF PANEL -->
 <div id="dofPanel">
@@ -79,7 +109,9 @@ td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.85rem;ver
                 <div style="font-weight:700;color:var(--primary);font-size:0.85rem;margin-bottom:12px">➕ Yeni Faaliyet Ekle</div>
                 <input type="hidden" id="dof_duzenle_id">
                 <div class="fg fg2">
-                    <div class="full"><label>Kök Neden</label><textarea id="dof_kok_neden" style="min-height:50px" placeholder="Uygunsuzluğun kök nedeni..."></textarea></div>
+                    <div class="full"><label>Kök Sebep Analizi</label><textarea id="dof_kok_neden" style="min-height:55px" placeholder="Uygunsuzluğun temel kök sebebi..."></textarea></div>
+                    <div class="full"><label>Kaplam Etki Analizi</label><textarea id="dof_kapsam_etki" style="min-height:55px" placeholder="Uygunsuzluğun etkilediği kapsam ve alanlar..."></textarea></div>
+                    <div class="full"><label>Yayılma Etki Analizi</label><textarea id="dof_yayilma_etki" style="min-height:55px" placeholder="Uygunsuzluğun yayılma riski ve etkilenen süreçler..."></textarea></div>
                     <div class="full"><label>Faaliyet Tanımı</label><textarea id="dof_faaliyet" style="min-height:50px" placeholder="Yapılacak düzeltici faaliyet..."></textarea></div>
                     <div><label>Sorumlu</label><input type="text" id="dof_sorumlu" placeholder="Ad Soyad"></div>
                     <div><label>Termin</label><input type="date" id="dof_termin"></div>
@@ -114,13 +146,22 @@ td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.85rem;ver
                     <option value="ic_denetim">İç Denetim</option>
                     <option value="musteri_sikayet">Müşteri Şikayeti</option>
                     <option value="ic_tetkik">İç Tetkik</option>
+                    <option value="turkak_denetimi">Türkak Denetimi</option>
                     <option value="cevresel">Çevresel</option>
                     <option value="diger">Diğer</option>
                 </select>
             </div>
         </div>
-        <div class="fg fg2">
+        <div class="fg fg3">
             <div><label>Tespit Eden</label><input type="text" id="tespit_eden" placeholder="Ad Soyad"></div>
+            <div>
+                <label>Uygunsuzluk Sınıfı</label>
+                <select id="sinif">
+                    <option value="">— Seçin —</option>
+                    <option value="onemli">Önemli</option>
+                    <option value="kucuk">Küçük</option>
+                </select>
+            </div>
             <div>
                 <label>Durum</label>
                 <select id="durum">
@@ -129,6 +170,9 @@ td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.85rem;ver
                     <option value="kapali">Kapalı</option>
                 </select>
             </div>
+        </div>
+        <div class="fg">
+            <div class="full"><label>Esas Alınan Şart <span style="font-weight:400;color:#94a3b8">(Örn: Standart Maddesi)</span></label><input type="text" id="esas_alinan_sart" placeholder="Örn: ISO 17025 Madde 6.2.3"></div>
         </div>
         <div class="fg">
             <div class="full"><label>Uygunsuzluk Açıklaması *</label><textarea id="aciklama" placeholder="Uygunsuzluğun detaylı açıklaması..."></textarea></div>
@@ -148,7 +192,7 @@ td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.85rem;ver
     <div class="kanban" id="kanban"></div>
     <div style="padding:0 18px 18px">
         <table><thead><tr>
-            <th>Kayıt No</th><th>Tarih</th><th>Kaynak</th><th>Açıklama</th><th>Tespit Eden</th><th>Durum</th><th>İşlemler</th>
+            <th>Kayıt No</th><th>Tarih</th><th>Kaynak</th><th>Sınıf</th><th>Esas Alınan Şart</th><th>Açıklama</th><th>Tespit Eden</th><th>Durum</th><th>İşlemler</th>
         </tr></thead><tbody id="liste"></tbody></table>
     </div>
 </div>
@@ -161,7 +205,7 @@ function toggleAcc(){const c=document.getElementById('accContent'),h=document.ge
 
 const DUR_LABEL={acik:'Açık',incelemede:'İncelemede',kapali:'Kapalı'};
 const DUR_RENK={acik:'b-acik',incelemede:'b-incelemede',kapali:'b-kapali'};
-const KAYNAK_LABEL={ic_denetim:'İç Denetim',musteri_sikayet:'Müşteri Şikayeti',ic_tetkik:'İç Tetkik',cevresel:'Çevresel',diger:'Diğer'};
+const KAYNAK_LABEL={ic_denetim:'İç Denetim',musteri_sikayet:'Müşteri Şikayeti',ic_tetkik:'İç Tetkik',turkak_denetimi:'Türkak Denetimi',cevresel:'Çevresel',diger:'Diğer'};
 
 function renderKanban(){
     const wrap=document.getElementById('kanban');
@@ -197,17 +241,25 @@ function renderListe(data){
         const durum=r.durum||'acik';
         const tar=r.tarih?new Date(r.tarih).toLocaleDateString('tr-TR'):'-';
         const ac=r.aciklama||'';
+        const sinifBadge = r.sinif==='onemli'
+            ? '<span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:8px;font-size:0.72rem;font-weight:700">Önemli</span>'
+            : r.sinif==='kucuk'
+            ? '<span style="background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:8px;font-size:0.72rem;font-weight:700">Küçük</span>'
+            : '—';
         return `<tr>
             <td style="font-weight:700;color:var(--primary)">${r.kayit_no||'—'}</td>
             <td>${tar}</td>
             <td>${KAYNAK_LABEL[r.kaynak]||r.kaynak||'—'}</td>
-            <td style="max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${ac}">${ac}</td>
+            <td>${sinifBadge}</td>
+            <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.esas_alinan_sart||''}">${r.esas_alinan_sart||'—'}</td>
+            <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${ac}">${ac}</td>
             <td>${r.tespit_eden||'—'}</td>
             <td><span class="badge ${DUR_RENK[durum]}">${DUR_LABEL[durum]}</span></td>
             <td>
                 <div class="act-wrap" id="am-${r.id}">
                     <button class="act-btn" onclick="menuToggle(${r.id},event)">İşlemler ▾</button>
                     <div class="act-drop">
+                        <div class="act-drop-item" onclick="goruntule(${r.id});menuKapat()">👁️ Görüntüle</div>
                         <div class="act-drop-item" onclick="dofAc(${r.id});menuKapat()">🔧 DÖF Yönet</div>
                         <hr>
                         <div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>
@@ -218,6 +270,25 @@ function renderListe(data){
         </tr>`;
     }).join('');
 }
+
+function goruntule(id){
+    const r=tumKayitlar.find(x=>x.id===id);if(!r)return;
+    const tar=r.tarih?new Date(r.tarih).toLocaleDateString('tr-TR'):'-';
+    const sinifText=r.sinif==='onemli'?'<span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:8px;font-size:0.8rem;font-weight:700">Önemli</span>':r.sinif==='kucuk'?'<span style="background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:8px;font-size:0.8rem;font-weight:700">Küçük</span>':'—';
+    const durumText=`<span class="badge ${DUR_RENK[r.durum||'acik']}">${DUR_LABEL[r.durum||'acik']}</span>`;
+    document.getElementById('goruntuleIcerik').innerHTML=`
+        <div class="gor-row"><div class="gor-lbl">Kayıt No</div><div class="gor-val" style="font-weight:700;color:var(--primary)">${r.kayit_no||'—'}</div></div>
+        <div class="gor-row"><div class="gor-lbl">Tarih</div><div class="gor-val">${tar}</div></div>
+        <div class="gor-row"><div class="gor-lbl">Kaynak</div><div class="gor-val">${KAYNAK_LABEL[r.kaynak]||r.kaynak||'—'}</div></div>
+        <div class="gor-row"><div class="gor-lbl">Sınıf</div><div class="gor-val">${sinifText}</div></div>
+        <div class="gor-row"><div class="gor-lbl">Tespit Eden</div><div class="gor-val">${r.tespit_eden||'—'}</div></div>
+        <div class="gor-row"><div class="gor-lbl">Durum</div><div class="gor-val">${durumText}</div></div>
+        <div class="gor-row"><div class="gor-lbl">Esas Alınan Şart</div><div class="gor-val">${r.esas_alinan_sart||'—'}</div></div>
+        <div class="gor-row"><div class="gor-lbl">Açıklama</div><div class="gor-val" style="white-space:pre-wrap">${r.aciklama||'—'}</div></div>
+    `;
+    document.getElementById('goruntulePanel').classList.add('open');
+}
+function goruntuleKapat(){document.getElementById('goruntulePanel').classList.remove('open')}
 
 function menuToggle(id,e){
     e.stopPropagation();
@@ -244,9 +315,11 @@ async function kaydet(){
         kaynak:document.getElementById('kaynak').value,
         aciklama,
         tespit_eden:document.getElementById('tespit_eden').value.trim(),
-        durum:document.getElementById('durum').value
+        durum:document.getElementById('durum').value,
+        esas_alinan_sart:document.getElementById('esas_alinan_sart').value.trim(),
+        sinif:document.getElementById('sinif').value
     };
-    if(!confirm(duzenleId?'Güncellemek istediğinize emin misiniz?':'Kaydetmek istediğinize emin misiniz?'))return;
+    if(!await onayModal(duzenleId?'Bu kaydı güncellemek istediğinize emin misiniz?':'Bu kaydı kaydetmek istediğinize emin misiniz?'))return;
     const btn=document.getElementById('saveBtn');btn.disabled=true;btn.textContent='Kaydediliyor...';
     const url=duzenleId?`/api/uygunsuzluk/${duzenleId}`:'/api/uygunsuzluk';
     const method=duzenleId?'PUT':'POST';
@@ -265,6 +338,8 @@ function duzenle(id){
     document.getElementById('aciklama').value=r.aciklama||'';
     document.getElementById('tespit_eden').value=r.tespit_eden||'';
     document.getElementById('durum').value=r.durum||'acik';
+    document.getElementById('esas_alinan_sart').value=r.esas_alinan_sart||'';
+    document.getElementById('sinif').value=r.sinif||'';
     document.getElementById('saveBtn').textContent='💾 Güncelle';
     const c=document.getElementById('accContent');c.style.display='block';
     document.getElementById('accHeader').classList.add('active');
@@ -273,14 +348,15 @@ function duzenle(id){
 }
 
 async function sil(id){
-    if(!confirm('Bu kaydı silmek istediğinize emin misiniz?'))return;
+    if(!await onayModal('Bu kaydı silmek istediğinize emin misiniz?', true))return;
     const res=await fetch(`/api/uygunsuzluk/${id}`,{method:'DELETE'});
     if(res.ok){showToast('🗑️ Silindi!');listele()}else showToast('❌ Silinemedi!',true);
 }
 
 function formTemizle(){
-    ['duzenle_id','kayit_no','tarih','aciklama','tespit_eden'].forEach(id=>document.getElementById(id).value='');
+    ['duzenle_id','kayit_no','tarih','aciklama','tespit_eden','esas_alinan_sart'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('kaynak').value='';
+    document.getElementById('sinif').value='';
     document.getElementById('durum').value='acik';
     document.getElementById('saveBtn').textContent='💾 Kaydet';
     document.getElementById('accContent').style.display='none';
@@ -318,7 +394,9 @@ async function dofListele(){
                 </div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.83rem">
-                <div><span style="color:#64748b;font-weight:600">Kök Neden:</span> ${d.kok_neden||'—'}</div>
+                <div style="grid-column:1/-1"><span style="color:#64748b;font-weight:600">Kök Sebep Analizi:</span> ${d.kok_neden||'—'}</div>
+                ${d.kapsam_etki?`<div style="grid-column:1/-1"><span style="color:#64748b;font-weight:600">Kaplam Etki Analizi:</span> ${d.kapsam_etki}</div>`:''}
+                ${d.yayilma_etki?`<div style="grid-column:1/-1"><span style="color:#64748b;font-weight:600">Yayılma Etki Analizi:</span> ${d.yayilma_etki}</div>`:''}
                 <div><span style="color:#64748b;font-weight:600">Sorumlu:</span> ${d.sorumlu||'—'}</div>
                 <div style="grid-column:1/-1"><span style="color:#64748b;font-weight:600">Faaliyet:</span> ${d.faaliyet_tanimi||'—'}</div>
                 <div><span style="color:#64748b;font-weight:600">Termin:</span> ${ter}</div>
@@ -336,6 +414,8 @@ async function dofDuzenle(id){
     const d=data.find(x=>x.id===id);if(!d)return;
     document.getElementById('dof_duzenle_id').value=d.id;
     document.getElementById('dof_kok_neden').value=d.kok_neden||'';
+    document.getElementById('dof_kapsam_etki').value=d.kapsam_etki||'';
+    document.getElementById('dof_yayilma_etki').value=d.yayilma_etki||'';
     document.getElementById('dof_faaliyet').value=d.faaliyet_tanimi||'';
     document.getElementById('dof_sorumlu').value=d.sorumlu||'';
     document.getElementById('dof_termin').value=d.termin?d.termin.substring(0,10):'';
@@ -349,6 +429,8 @@ async function dofKaydet(){
     const payload={
         uygunsuzluk_id:aktifUygunsuzlukId,
         kok_neden:document.getElementById('dof_kok_neden').value.trim(),
+        kapsam_etki:document.getElementById('dof_kapsam_etki').value.trim(),
+        yayilma_etki:document.getElementById('dof_yayilma_etki').value.trim(),
         faaliyet_tanimi:document.getElementById('dof_faaliyet').value.trim(),
         sorumlu:document.getElementById('dof_sorumlu').value.trim(),
         termin:document.getElementById('dof_termin').value||null,
@@ -365,18 +447,46 @@ async function dofKaydet(){
 }
 
 async function dofSil(id){
-    if(!confirm('Bu DÖF kaydını silmek istediğinize emin misiniz?'))return;
+    if(!await onayModal('Bu DÖF kaydını silmek istediğinize emin misiniz?', true))return;
     const res=await fetch(`/api/dof/${id}`,{method:'DELETE'});
     if(res.ok){showToast('🗑️ Silindi!');dofListele()}else showToast('❌ Silinemedi!',true);
 }
 
 function dofFormTemizle(){
-    ['dof_duzenle_id','dof_kok_neden','dof_faaliyet','dof_sorumlu','dof_termin','dof_tamamlandi','dof_sonuc'].forEach(id=>document.getElementById(id).value='');
+    ['dof_duzenle_id','dof_kok_neden','dof_kapsam_etki','dof_yayilma_etki','dof_faaliyet','dof_sorumlu','dof_termin','dof_tamamlandi','dof_sonuc'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('dofSaveBtn').textContent='💾 Ekle';
 }
 
 listele();
+
+function onayModal(mesaj, tehlikeli=false){
+    return new Promise(resolve=>{
+        document.getElementById('onayMesaj').textContent=mesaj;
+        const evetBtn=document.getElementById('onayEvet');
+        evetBtn.className='onay-evet'+(tehlikeli?' danger':'');
+        evetBtn.textContent=tehlikeli?'🗑️ Sil':'✅ Evet, Devam Et';
+        document.getElementById('onayModal').classList.add('open');
+        const kapat=(sonuc)=>{
+            document.getElementById('onayModal').classList.remove('open');
+            resolve(sonuc);
+        };
+        document.getElementById('onayIptal').onclick=()=>kapat(false);
+        document.getElementById('onayEvet').onclick=()=>kapat(true);
+    });
+}
 </script>
+
+<div id="onayModal">
+    <div class="onay-box">
+        <div class="onay-icon">⚠️</div>
+        <div class="onay-mesaj" id="onayMesaj"></div>
+        <div class="onay-btns">
+            <button class="onay-iptal" id="onayIptal">İptal</button>
+            <button class="onay-evet" id="onayEvet">✅ Evet, Devam Et</button>
+        </div>
+    </div>
+</div>
+
 <script src="sort-utils.js"></script>
 </body>
 </html>
