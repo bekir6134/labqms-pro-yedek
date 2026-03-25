@@ -1,4 +1,15 @@
 /**
+ * yetkiVar(izin) — Kullanıcının belirtilen izne sahip olup olmadığını kontrol eder.
+ * Kullanım: yetkiVar('musteriler_duzenle')
+ */
+window.yetkiVar = function(izin) {
+    try {
+        const user = JSON.parse(localStorage.getItem('labqms_user') || '{}');
+        return (user.erisimler || []).includes(izin);
+    } catch(e) { return true; }
+};
+
+/**
  * sort-utils.js — Tüm tablolara tıklanabilir başlık sıralaması ekler.
  * Kullanım: <script src="sort-utils.js"></script> yeterli, başka çağrı gerekmez.
  * Manuel çağrı: initSortable('tableId') — dinamik yüklenen tablolar için.

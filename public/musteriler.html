@@ -255,9 +255,9 @@
                         <button class="act-btn" onclick="menuToggle(${m.id},event)">İşlemler ▾</button>
                         <div class="act-drop">
                             <div class="act-drop-item" onclick="goruntule(${m.id});menuKapat()">👁️ Detay</div>
-                            <div class="act-drop-item" onclick='duzenle(${JSON.stringify(m).replace(/'/g,"&#39;")});menuKapat()'>✏️ Düzenle</div>
+                            ${yetkiVar('musteriler_duzenle') ? `<div class="act-drop-item" onclick='duzenle(${JSON.stringify(m).replace(/'/g,"&#39;")});menuKapat()'>✏️ Düzenle</div>` : ''}
                             <hr>
-                            <div class="act-drop-item danger" onclick="sil(${m.id});menuKapat()">🗑️ Sil</div>
+                            ${yetkiVar('musteriler_sil') ? `<div class="act-drop-item danger" onclick="sil(${m.id});menuKapat()">🗑️ Sil</div>` : ''}
                         </div>
                     </div>
                 </td>

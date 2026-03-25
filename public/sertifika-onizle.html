@@ -339,8 +339,12 @@ async function yukle() {
                     sayfaDiv.style.cssText = 'padding:0;width:210mm;overflow:hidden;background:white;';
 
                     const hd = document.createElement('div');
-                    hd.style.cssText = 'padding:4mm 15mm 2mm;border-bottom:1pt solid #222;display:flex;justify-content:space-between;align-items:center;';
-                    hd.innerHTML = '<span style="font-size:8pt;font-weight:700;color:#1E3A5F;position:absolute;left:50%;transform:translateX(-50%);text-align:center;">' + labAdi + '</span><span style="font-size:8pt;font-weight:700;color:#1E3A5F;margin-left:auto;white-space:nowrap;">' + sertNo + '</span>';
+                    hd.style.cssText = 'padding:10mm 15mm 2mm;display:flex;justify-content:space-between;align-items:center;';
+                    const _kw = 'DANIŞMANLIK', _ki = labAdi.indexOf(_kw);
+                    const labAdiHtml = _ki !== -1
+                        ? labAdi.slice(0, _ki + _kw.length) + '<br>' + labAdi.slice(_ki + _kw.length).trim()
+                        : labAdi;
+                    hd.innerHTML = '<span style="font-size:10pt;font-weight:700;color:#1E3A5F;position:absolute;left:50%;transform:translateX(-50%);text-align:center;">' + labAdiHtml + '</span><span style="font-size:10pt;font-weight:700;color:#1E3A5F;margin-left:auto;white-space:nowrap;">' + sertNo + '</span>';
                     hd.style.position = 'relative';
                     sayfaDiv.appendChild(hd);
 
@@ -350,8 +354,20 @@ async function yukle() {
                     sayfaDiv.appendChild(canvasWrap);
 
                     const ft = document.createElement('div');
-                    ft.style.cssText = 'padding:2mm 15mm 3mm;border-top:0.5pt solid #ccc;';
-                    ft.innerHTML = '<p style="font-size:5.5pt;color:#555;font-style:italic;text-align:center;line-height:1.4;margin-bottom:1mm;">Bu sertifika dijital imzalıdır. İzinsiz kopyalanamaz.</p><div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:6.5pt;color:#555;">' + formNo + '</span><span style="font-size:6.5pt;color:#555;">Sayfa No: ' + (2+i) + ' / ' + toplamSayfa + '</span></div>';
+                    ft.style.cssText = 'padding:0 15mm 2mm;';
+                    ft.innerHTML = `
+                        <div style="font-size:5.5pt;color:#555;text-align:center;line-height:1.5;border-top:0.5pt solid #ccc;padding-top:2px;margin-bottom:1px;">
+                            <div style="font-style:italic;margin-bottom:1px;">Bu sertifika, laboratuvarın yazılı izni olmadan kısmen kopyalanıp çoğaltılamaz. &nbsp;|&nbsp; İmzasız ve TÜRKAK Doğrulama Kare Kodu bulunmayan sertifikalar geçersizdir. &nbsp;|&nbsp; Bu sertifikanın kullanımından önce <b>asist.turkak.org.tr</b> bağlantısı üzerinden kare kodu okutarak doğrulayınız.</div>
+                            <div style="color:#aaa;">This certificate shall not be reproduced other than in full except with the permission of the laboratory. &nbsp;|&nbsp; Certificates that are unsigned and do not contain TÜRKAK Certificate Verification System's verification QR code are invalid. &nbsp;|&nbsp; Before using this certificate, verify it by scanning the QR code via <b>asist.turkak.org.tr</b>.</div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;border-top:0.3pt solid #ccc;padding-top:2px;margin-top:2px;font-size:6pt;color:#555;">
+                            <span>${labAdi}  ${labAdres}</span>
+                            <span>${[labTel?'Tel: '+labTel:'',labWeb,labMail].filter(Boolean).join('  |  ')}</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-top:2px;font-size:6.5pt;color:#555;padding-bottom:2px;">
+                            <span>${formNo}</span>
+                            <span>Sayfa No: ${2+i} / ${toplamSayfa}</span>
+                        </div>`;
                     sayfaDiv.appendChild(ft);
 
                     sayfaIci.appendChild(sayfaDiv);

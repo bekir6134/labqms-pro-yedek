@@ -2079,6 +2079,60 @@ app.get('/api/turkak-token', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// TBDS müşteri listesi + otomatik eşleştirme
+app.get('/api/turkak/musteri-listesi', async (req, res) => {
+    try {
+        const tokenResult = await pool.query("SELECT deger FROM ayarlar WHERE anahtar='turkak_token'");
+        if (!tokenResult.rows.length) return res.status(400).json({ error: "Türkak token bulunamadı. Önce bağlantı testi yapın." });
+        const token = tokenResult.rows[0].deger;
+
+        const tbdsRes = await fetch('https://api.turkak.org.tr/TBDS/api/v1/CalibrationService/CalibrationCertificateGetData/', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!tbdsRes.ok) return res.status(tbdsRes.status).json({ error: "TBDS'e erişilemedi: " + tbdsRes.status });
+        const tbdsData = await tbdsRes.json();
+
+        const musteriResult = await pool.query('SELECT id, firma_adi, turkak_id FROM musteriler ORDER BY firma_adi');
+        const musteriler = musteriResult.rows;
+
+        const liste = (Array.isArray(tbdsData) ? tbdsData : []).map(item => {
+            const tbdsAd = (item.Name || '').toLowerCase();
+            let enIyi = null, enIyiSkor = 0;
+            for (const m of musteriler) {
+                const mAd = (m.firma_adi || '').toLowerCase();
+                if (mAd.includes(tbdsAd.slice(0, 6)) || tbdsAd.includes(mAd.slice(0, 6))) {
+                    const skor = tbdsAd === mAd ? 100 : (mAd.includes(tbdsAd) || tbdsAd.includes(mAd) ? 80 : 50);
+                    if (skor > enIyiSkor) { enIyiSkor = skor; enIyi = m; }
+                }
+            }
+            return {
+                tbds_id: item.ID,
+                tbds_ad: item.Name,
+                eslesen_id: enIyi ? enIyi.id : null,
+                eslesen_ad: enIyi ? enIyi.firma_adi : null,
+                zaten_eslesmis: enIyi ? !!enIyi.turkak_id : false
+            };
+        });
+
+        res.json({ liste, musteriler: musteriler.map(m => ({ id: m.id, firma_adi: m.firma_adi })) });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// TBDS müşteri eşleştirme — turkak_id yaz
+app.post('/api/turkak/musteri-eslestir', async (req, res) => {
+    try {
+        const { eslesmeler } = req.body; // [{ musteri_id, turkak_id }]
+        if (!eslesmeler || !eslesmeler.length) return res.status(400).json({ error: "Eşleşme listesi boş" });
+        let guncellenen = 0;
+        for (const e of eslesmeler) {
+            if (!e.musteri_id || !e.turkak_id) continue;
+            await pool.query('UPDATE musteriler SET turkak_id=$1 WHERE id=$2', [e.turkak_id, e.musteri_id]);
+            guncellenen++;
+        }
+        res.json({ success: true, guncellenen });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // --- ÇEVRE KOŞULLARI ---
 app.get('/api/cevre-kosullari', async (req, res) => {
     try {
@@ -2365,25 +2419,29 @@ app.get('/api/sertifikalar/:id/pdf', async (req, res) => {
         const labMail  = ayar.email     || ayar.lab_mail  || '';
 
         // Footer HTML → PDF (Puppeteer ile, browser hâlâ açık)
+        const formNo = ayar.form_no || 'AKFG448 Rev02 110625';
         const footerHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
         <style>*{margin:0;padding:0;box-sizing:border-box}
-        body{width:794px;height:72px;background:white;font-family:Arial,sans-serif;padding:4px 15px 2px}
-        .line1{border-top:0.6px solid #aaa;padding-top:3px;display:flex;justify-content:space-between;font-size:7px;color:#555}
-        .line2{border-top:0.3px solid #ccc;margin-top:3px;padding-top:2px;font-size:6px;color:#555;line-height:1.45}
+        body{width:794px;height:120px;background:white;font-family:Arial,sans-serif;padding:0 15px 2px;display:flex;flex-direction:column;justify-content:flex-end;}
+        .yasal{font-size:5.5pt;color:#555;text-align:center;line-height:1.5;border-top:0.5pt solid #ccc;padding-top:2px;margin-bottom:1px;}
+        .yasal-tr{font-style:italic;margin-bottom:1px;}
+        .yasal-en{color:#aaa;}
+        .alt-bar{display:flex;justify-content:space-between;border-top:0.3pt solid #ccc;padding-top:2px;margin-top:2px;font-size:6pt;color:#555;}
+        .sayfa-no{display:flex;justify-content:space-between;margin-top:2px;font-size:6.5pt;color:#555;padding-bottom:2px;}
         </style></head><body>
-        <div class="line1"><span>${labAdi}  ${labAdres}</span><span>${[labTel?'Tel: '+labTel:'',labWeb,labMail].filter(Boolean).join('  |  ')}</span></div>
-        <div class="line2">
-          Bu sertifika, laboratuvarin yazili izni olmadan kismen kopyalanip cogaltilamaz. | Imzasiz ve TURKAK Dogrulama Kare Kodu bulunmayan sertifikalar gecersizdir.<br>
-          Bu sertifikanin kullanimindan once asist.turkak.org.tr uzerinden kare kodu okutarak dogrulayiniz.<br>
-          This certificate shall not be reproduced other than in full except with the permission of the laboratory. | Certificates unsigned or without TURKAK QR code are invalid.<br>
-          Before using this certificate, verify it by scanning the QR code via asist.turkak.org.tr.
-        </div></body></html>`;
+        <div class="yasal">
+          <div class="yasal-tr">Bu sertifika, laboratuvarin yazili izni olmadan kismen kopyalanip cogaltilamaz. &nbsp;|&nbsp; Imzasiz ve TURKAK Dogrulama Kare Kodu bulunmayan sertifikalar gecersizdir. &nbsp;|&nbsp; Bu sertifikanin kullanimindan once <b>asist.turkak.org.tr</b> uzerinden kare kodu okutarak dogrulayiniz.</div>
+          <div class="yasal-en">This certificate shall not be reproduced other than in full except with the permission of the laboratory. &nbsp;|&nbsp; Certificates unsigned or without TURKAK QR code are invalid. &nbsp;|&nbsp; Before using this certificate, verify it by scanning the QR code via asist.turkak.org.tr.</div>
+        </div>
+        <div class="alt-bar"><span>${labAdi}  ${labAdres}</span><span>${[labTel?'Tel: '+labTel:'',labWeb,labMail].filter(Boolean).join('  |  ')}</span></div>
+        <div class="sayfa-no"><span>${formNo}</span><span></span></div>
+        </body></html>`;
 
         const footerPage = await browser.newPage();
-        await footerPage.setViewport({ width: 794, height: 72 });
+        await footerPage.setViewport({ width: 794, height: 120 });
         await footerPage.setContent(footerHtml, { waitUntil: 'networkidle0' });
         const footerBuffer = await footerPage.pdf({
-            width: '794px', height: '72px',
+            width: '794px', height: '120px',
             margin: { top: '0', right: '0', bottom: '0', left: '0' },
             printBackground: true,
         });
@@ -2405,14 +2463,16 @@ app.get('/api/sertifikalar/:id/pdf', async (req, res) => {
 
             // Footer PDF'ini XObject olarak göm
             const [embFooter] = await birlesikDoc.embedPdf(footerBuffer, [0]);
-            const footerH = 72 * (841.89 / 1122.52); // px → pt (A4 oranı)
+            const footerH = 120 * (841.89 / 1122.52); // px → pt (A4 oranı)
 
             // Ölçüm sayfalarını yeni A4 sayfalara XObject olarak yerleştir
             const embOlcumPages = await birlesikDoc.embedPdf(olcumBytes);
             const pageW = 595.28, pageH = 841.89;
-            const copiedPages = []; // compat
+            const helv = await birlesikDoc.embedFont(StandardFonts.Helvetica);
+            const totalPages = s1s2Pages.length + embOlcumPages.length;
 
             // Her ölçüm sayfasını yeni A4'e XObject(ölçüm) + XObject(footer) olarak yerleştir
+            let olcumIdx = 0;
             for (const embOlcum of embOlcumPages) {
                 const newPage = birlesikDoc.addPage([pageW, pageH]);
                 const contentH = pageH - footerH;
@@ -2425,6 +2485,18 @@ app.get('/api/sertifikalar/:id/pdf', async (req, res) => {
                 newPage.drawPage(embOlcum, { x: xOff, y: footerH, width: scaledW, height: scaledH });
                 // Footer - alt alana (Puppeteer ile render edilmiş HTML)
                 newPage.drawPage(embFooter, { x: 0, y: 0, width: pageW, height: footerH });
+                // Sayfa numarası - footer'ın sayfa-no satırına
+                const pageNumStr = `Sayfa No: ${s1s2Pages.length + olcumIdx + 1} / ${totalPages}`;
+                const fontSize = 5.8;
+                const textWidth = helv.widthOfTextAtSize(pageNumStr, fontSize);
+                newPage.drawText(pageNumStr, {
+                    x: pageW - 15 - textWidth,
+                    y: 5,
+                    size: fontSize,
+                    font: helv,
+                    color: rgb(0.33, 0.33, 0.33),
+                });
+                olcumIdx++;
             }
 
             const birlesikBytes = await birlesikDoc.save();
@@ -2475,9 +2547,14 @@ app.post('/api/sertifikalar/:id/olcum-pdf', async (req, res) => {
         const key = `olcum/${req.params.id}_olcum.pdf`;
         const buffer = Buffer.from(pdf_base64, 'base64');
         await r2Yukle(key, buffer);
+        // Mevcut aşamayı kontrol et; hazırlanıyor ise tamamlandı'ya geç
+        const mevcut = await pool.query('SELECT asama FROM sertifikalar WHERE id=$1', [req.params.id]);
+        const yeniAsama = (mevcut.rows[0]?.asama || 'hazırlanıyor') === 'hazırlanıyor' ? 'tamamlandı' : null;
         const result = await pool.query(
-            `UPDATE sertifikalar SET olcum_pdf_url=$1, olcum_pdf_sayfa=$2 WHERE id=$3 RETURNING id, olcum_pdf_sayfa`,
-            [key, sayfa_sayisi||0, req.params.id]
+            yeniAsama
+                ? `UPDATE sertifikalar SET olcum_pdf_url=$1, olcum_pdf_sayfa=$2, asama=$4 WHERE id=$3 RETURNING id, olcum_pdf_sayfa, asama`
+                : `UPDATE sertifikalar SET olcum_pdf_url=$1, olcum_pdf_sayfa=$2 WHERE id=$3 RETURNING id, olcum_pdf_sayfa, asama`,
+            yeniAsama ? [key, sayfa_sayisi||0, req.params.id, yeniAsama] : [key, sayfa_sayisi||0, req.params.id]
         );
         res.json(result.rows[0]);
     } catch(err) { res.status(500).json({ error: err.message }); }
@@ -2686,12 +2763,16 @@ app.post('/api/turkak/akredite-no-ver-toplu', async (req, res) => {
 
         const token = tokenResult.rows[0].deger;
 
+        let basariliSayac = 0, beklemede = 0, hataliSayac = 0;
+
         for(const id of idler){
 
             const s = await pool.query(`
-                SELECT s.*, m.turkak_id AS musteri_turkak_id
+                SELECT s.*, m.turkak_id AS musteri_turkak_id,
+                       p.ad_soyad AS kal_yapan_adi
                 FROM sertifikalar s
                 LEFT JOIN musteriler m ON s.musteri_id = m.id
+                LEFT JOIN personeller p ON s.kal_yapan_id = p.id
                 WHERE s.id=$1
             `,[id]);
 
@@ -2701,15 +2782,18 @@ app.post('/api/turkak/akredite-no-ver-toplu', async (req, res) => {
 
             if(!sertifika.musteri_turkak_id){
                 console.log("Müşteri Türkak ID yok:", id);
+                hataliSayac++;
                 continue;
             }
 
             const payload = [{
                 CustomerID: sertifika.musteri_turkak_id,
                 CalibrationDate: sertifika.kal_tarihi,
-                FirstReleaseDateOfTheDocument: sertifika.yayin_tarihi,
-                MachineOrDeviceType: sertifika.cihaz_adi,
-                DeviceSerialNumber: sertifika.seri_no
+                FirstReleaseDateOfTheDocument: sertifika.yayin_tarihi || sertifika.kal_tarihi,
+                MachineOrDeviceType: sertifika.cihaz_adi || null,
+                DeviceSerialNumber: sertifika.seri_no || null,
+                PersonnelPerformingCalibration: sertifika.kal_yapan_adi || null,
+                CalibrationLocation: sertifika.kal_yeri || null
             }];
 
             const response = await fetch(
@@ -2746,13 +2830,12 @@ try {
 
             if(!turkakId){
                 console.log("Türkak ID alınamadı:", data);
+                hataliSayac++;
                 continue;
             }
 
             await pool.query(
-                `UPDATE sertifikalar
-                 SET turkak_id=$2, turkak_durum='Taslak'
-                 WHERE id=$1`,
+                `UPDATE sertifikalar SET turkak_id=$2, turkak_durum='Taslak' WHERE id=$1`,
                 [id, turkakId]
             );
 
@@ -2760,45 +2843,73 @@ try {
 
             const detayRes = await fetch(
                 `https://api.turkak.org.tr/TBDS/api/v1/CalibrationService/CalibrationCertificateGetCertificate/${turkakId}`,
-                {
-                    headers:{
-                        'Authorization': `Bearer ${token}`
-
-                    }
-                }
+                { headers: { 'Authorization': `Bearer ${token}` } }
             );
 
             const detayText = await detayRes.text();
+            let detay;
+            try { detay = JSON.parse(detayText); } catch(e) { hataliSayac++; continue; }
 
-console.log('TBDS detail status:', detayRes.status);
-console.log('TBDS detail raw response:', detayText);
-
-let detay;
-try {
-    detay = JSON.parse(detayText);
-} catch (e) {
-    throw new Error(`TBDS detail JSON değil. Status: ${detayRes.status}, Cevap: ${detayText}`);
-}
-
-            const tbdsNo = detay?.TBDSNumber || null;
+            const tbdsNo   = detay?.TBDSNumber || null;
             const turkakNo = detay?.CertificationBodyDocumentNumber || null;
-            const state = detay?.State || 'Taslak';
+            const state    = detay?.State || 'Taslak';
 
             await pool.query(`
-                UPDATE sertifikalar
-                SET
-                sertifika_no=$2,
-                tbds_no=$3,
-                turkak_durum=$4
-                WHERE id=$1
+                UPDATE sertifikalar SET sertifika_no=$2, tbds_no=$3, turkak_durum=$4 WHERE id=$1
             `,[id, turkakNo, tbdsNo, state]);
 
+            if (state === 'Active' || state === 'Aktif') basariliSayac++;
+            else beklemede++;
         }
 
-        res.json({ success:true });
+        res.json({ success: true, basarili: basariliSayac, beklemede, hatali: hataliSayac });
 
     } catch(err){
         console.error("Türkak işlem hatası:",err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// TBDS sertifika durumunu güncelle (Taslak → Active kontrolü)
+app.post('/api/turkak/sertifika-aktif-et', async (req, res) => {
+    try {
+        const { idler } = req.body;
+        if (!idler || !idler.length) return res.status(400).json({ error: "Sertifika seçilmedi" });
+
+        const tokenResult = await pool.query("SELECT deger FROM ayarlar WHERE anahtar='turkak_token'");
+        if (!tokenResult.rows.length) return res.status(400).json({ error: "Türkak token bulunamadı" });
+        const token = tokenResult.rows[0].deger;
+
+        let aktifSayac = 0, taslakSayac = 0, hataliSayac = 0;
+
+        for (const id of idler) {
+            const s = await pool.query('SELECT turkak_id FROM sertifikalar WHERE id=$1', [id]);
+            if (!s.rows.length || !s.rows[0].turkak_id) { hataliSayac++; continue; }
+
+            const turkakId = s.rows[0].turkak_id;
+            const detayRes = await fetch(
+                `https://api.turkak.org.tr/TBDS/api/v1/CalibrationService/CalibrationCertificateGetCertificate/${turkakId}`,
+                { headers: { 'Authorization': `Bearer ${token}` } }
+            );
+
+            let detay;
+            try { detay = await detayRes.json(); } catch(e) { hataliSayac++; continue; }
+
+            const tbdsNo   = detay?.TBDSNumber || null;
+            const turkakNo = detay?.CertificationBodyDocumentNumber || null;
+            const state    = detay?.State || 'Taslak';
+
+            await pool.query(
+                `UPDATE sertifikalar SET tbds_no=$2, sertifika_no=$3, turkak_durum=$4 WHERE id=$1`,
+                [id, tbdsNo, turkakNo, state]
+            );
+
+            if (state === 'Active' || state === 'Aktif') aktifSayac++;
+            else taslakSayac++;
+        }
+
+        res.json({ success: true, aktif: aktifSayac, taslak: taslakSayac, hatali: hataliSayac });
+    } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });

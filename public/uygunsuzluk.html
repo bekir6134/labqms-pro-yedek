@@ -262,8 +262,8 @@ function renderListe(data){
                         <div class="act-drop-item" onclick="goruntule(${r.id});menuKapat()">👁️ Görüntüle</div>
                         <div class="act-drop-item" onclick="dofAc(${r.id});menuKapat()">🔧 DÖF Yönet</div>
                         <hr>
-                        <div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>
-                        <div class="act-drop-item danger" onclick="sil(${r.id});menuKapat()">🗑️ Sil</div>
+                        ${yetkiVar('uygunsuzluk_duzenle') ? `<div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>` : ''}
+                        ${yetkiVar('uygunsuzluk_sil') ? `<div class="act-drop-item danger" onclick="sil(${r.id});menuKapat()">🗑️ Sil</div>` : ''}
                     </div>
                 </div>
             </td>

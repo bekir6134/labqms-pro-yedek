@@ -146,8 +146,8 @@
                         <div class="act-wrap" id="am-${c.id}">
                             <button class="act-btn" onclick="menuToggle(${c.id},event)">İşlemler ▾</button>
                             <div class="act-drop">
-                                <div class="act-drop-item" onclick="duzenle(${JSON.stringify(c).replace(/"/g,'&quot;')});menuKapat()">✏️ Düzenle</div>
-                                <div class="act-drop-item danger" onclick="sil(${c.id});menuKapat()">🗑️ Sil</div>
+                                ${yetkiVar('cihaz_kutuphanesi_duzenle') ? `<div class="act-drop-item" onclick="duzenle(${JSON.stringify(c).replace(/"/g,'&quot;')});menuKapat()">✏️ Düzenle</div>` : ''}
+                                ${yetkiVar('cihaz_kutuphanesi_sil') ? `<div class="act-drop-item danger" onclick="sil(${c.id});menuKapat()">🗑️ Sil</div>` : ''}
                             </div>
                         </div>
                     </td>

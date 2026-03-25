@@ -211,8 +211,8 @@ function renderListe(data){
                     <div class="act-drop">
                         <div class="act-drop-item" onclick="revizeModalAc(${r.id});menuKapat()">🔄 Revize Oluştur</div>
                         <hr>
-                        <div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>
-                        <div class="act-drop-item danger" onclick="sil(${r.id});menuKapat()">🗑️ Sil</div>
+                        ${yetkiVar('kalite_dokuman_duzenle') ? `<div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>` : ''}
+                        ${yetkiVar('kalite_dokuman_sil') ? `<div class="act-drop-item danger" onclick="sil(${r.id});menuKapat()">🗑️ Sil</div>` : ''}
                     </div>
                 </div>
             </td>
@@ -262,8 +262,8 @@ async function accordionToggle(id, e) {
                         <div class="act-wrap" id="am-${r.id}">
                             <button class="act-btn" onclick="menuToggle(${r.id},event)">İşlemler ▾</button>
                             <div class="act-drop">
-                                <div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>
-                                <div class="act-drop-item danger" onclick="revSil(${r.id},${id});menuKapat()">🗑️ Sil</div>
+                                ${yetkiVar('kalite_dokuman_duzenle') ? `<div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>` : ''}
+                                ${yetkiVar('kalite_dokuman_sil') ? `<div class="act-drop-item danger" onclick="revSil(${r.id},${id});menuKapat()">🗑️ Sil</div>` : ''}
                             </div>
                         </div>
                     </td>

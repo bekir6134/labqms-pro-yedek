@@ -977,8 +977,8 @@
                         <div class="act-drop">
                             <div class="act-drop-item" onclick="pdfOnizle(${r.id});menuKapat()">📄 PDF Önizle</div>
                             <hr>
-                            <div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>
-                            <div class="act-drop-item danger" onclick="sil(${r.id});menuKapat()">🗑️ Sil</div>
+                            ${yetkiVar('kabul_duzenle') ? `<div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>` : ''}
+                            ${yetkiVar('kabul_sil') ? `<div class="act-drop-item danger" onclick="sil(${r.id});menuKapat()">🗑️ Sil</div>` : ''}
                         </div>
                     </div>
                 </td>

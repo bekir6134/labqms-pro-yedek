@@ -557,8 +557,8 @@
                             <div class="act-drop-item" onclick="pdfGoruntule(${t.id});menuKapat()">📄 PDF Önizle</div>
                             <div class="act-drop-item" onclick="teklifGonder(${t.id});menuKapat()">📧 Gönder</div>
                             <hr>
-                            <div class="act-drop-item" onclick="duzenle(${t.id});menuKapat()">✏️ Düzenle</div>
-                            <div class="act-drop-item danger" onclick="sil(${t.id});menuKapat()">🗑️ Sil</div>
+                            ${yetkiVar('teklif_duzenle') ? `<div class="act-drop-item" onclick="duzenle(${t.id});menuKapat()">✏️ Düzenle</div>` : ''}
+                            ${yetkiVar('teklif_sil') ? `<div class="act-drop-item danger" onclick="sil(${t.id});menuKapat()">🗑️ Sil</div>` : ''}
                         </div>
                     </div>
                 </td>
@@ -980,5 +980,6 @@ ${t.teklif_notu ? `<div class="note-box"><strong>Not / Note:</strong> ${t.teklif
 
     window.onload = sayfaYukle;
 </script>
+<script src="sort-utils.js"></script>
 </body>
 </html>

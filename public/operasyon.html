@@ -180,9 +180,19 @@
         .sort-th.asc::after  { content:' ↑'; color:var(--primary); }
         .sort-th.desc::after { content:' ↓'; color:var(--primary); }
 
-        #toast { visibility:hidden; min-width:260px; background-color:var(--success); color:#fff; text-align:center; border-radius:8px; padding:14px; position:fixed; z-index:9999; right:24px; top:24px; font-weight:600; box-shadow:0 4px 12px rgba(0,0,0,0.15); }
-        #toast.show { visibility:visible; }
+        #toast { visibility:hidden; min-width:260px; background-color:var(--success); color:#fff; text-align:center; border-radius:10px; padding:14px 18px; position:fixed; z-index:9999; right:24px; top:24px; font-weight:600; box-shadow:0 4px 16px rgba(0,0,0,0.18); font-size:0.9rem; }
+        #toast.show { visibility:visible; animation:toastIn .2s ease; }
         #toast.error { background-color:#ef4444; }
+        @keyframes toastIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+        #confirmToast { display:none; position:fixed; z-index:10000; top:24px; left:50%; transform:translateX(-50%); background:#1e293b; color:#fff; border-radius:12px; padding:18px 22px; min-width:320px; max-width:500px; box-shadow:0 8px 28px rgba(0,0,0,0.28); }
+        #confirmToast.show { display:block; animation:ctIn .2s ease; }
+        @keyframes ctIn { from{opacity:0;transform:translateX(-50%) translateY(-10px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+        #confirmToast .ct-msg { font-size:0.91rem; line-height:1.45; margin-bottom:14px; }
+        #confirmToast .ct-btns { display:flex; gap:8px; justify-content:flex-end; }
+        #confirmToast .ct-yes { background:#3b82f6; color:#fff; border:none; padding:8px 20px; border-radius:8px; font-weight:700; cursor:pointer; font-size:0.85rem; }
+        #confirmToast .ct-no  { background:#475569; color:#fff; border:none; padding:8px 20px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.85rem; }
+        #confirmToast .ct-yes:hover { background:#2563eb; }
+        #confirmToast .ct-no:hover  { background:#334155; }
 
         /* DROPDOWN MENÜ */
         .act-wrap { position:relative; display:inline-block; }
@@ -199,6 +209,13 @@
 </head>
 <body>
 <div id="toast"></div>
+<div id="confirmToast">
+    <div class="ct-msg" id="confirmToastMsg"></div>
+    <div class="ct-btns">
+        <button class="ct-no"  id="confirmToastNo">İptal</button>
+        <button class="ct-yes" id="confirmToastYes">Evet</button>
+    </div>
+</div>
 
 <!-- DETAY MODAL -->
 <div id="modal">
@@ -225,6 +242,7 @@
             <div class="pdf-sayfa-info" id="pdfSayfaBilgi"></div>
             <div style="display:flex;gap:8px;align-items:center;">
                 <input type="file" id="pdfDosyaInput" accept=".pdf" style="display:none;" onchange="pdfDosyaSecildi()">
+                <input type="file" id="topluPdfInput" accept=".pdf" multiple style="display:none;" onchange="topluPdfEslestirVeYukle()">
                 <label id="pdfYukleBtnLabel" for="pdfDosyaInput" style="background:#e0e7ff;color:#4338ca;padding:8px 14px;border-radius:8px;font-weight:700;font-size:0.83rem;cursor:pointer;display:none;">
                     📎 PDF Seç & Yükle
                 </label>
@@ -516,6 +534,7 @@
                 <select id="s_filtre_asama" onchange="sertFiltrele()">
                     <option value="">Tüm Aşamalar</option>
                     <option value="hazırlanıyor">Hazırlanıyor</option>
+                    <option value="tamamlandı">Tamamlandı</option>
                     <option value="imzalandı">İmzalandı</option>
                     <option value="onaylandı">Onaylandı</option>
                     <option value="sertifika_gönderildi">Gönderildi</option>
@@ -532,12 +551,13 @@
     <div class="toplu-bar" id="topluBar">
         <div class="secili-info" id="topluBilgi">0 sertifika seçildi</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn-toplu" onclick="document.getElementById('topluPdfInput').click()" id="btnTopluPdfYukle" style="background:#f0fdf4;color:#166534;">📂 Toplu PDF Yükle</button>
             <button class="btn-toplu" onclick="topluKapsamDisiNo()" id="btnTopluKDNo" style="background:#fef9c3;color:#854d0e;">🔢 Kapsam Dışı No Ver</button>
             <button class="btn-toplu" onclick="topluAkrediteNo()" id="btnTopluAkrNo" style="background:#e0f2fe;color:#0369a1;">🏛️ Akredite No Ver</button>
             <button class="btn-toplu" onclick="topluImzala()" id="btnTopluImzala">✍️ Seçilenleri İmzala</button>
             <button class="btn-toplu" onclick="topluOnayla()" id="btnTopluOnayla">✅ Seçilenleri Onayla</button>
             <button class="btn-toplu" onclick="topluMail()" id="btnTopluMail">📧 Seçilenlere Mail Gönder</button>
-
+            <button class="btn-toplu" onclick="topluTbdsAktif()" id="btnTopluTbdsAktif" style="background:#dcfce7;color:#166534;">✅ TBDS Aktif Et</button>
         </div>
     </div>
 
@@ -584,10 +604,11 @@
         'onaylandı':'Onaylandı', sertifika_gönderildi:'Sertifika Gönderildi'
     };
     const IE_ASAMALAR = ['kabul_edildi','hazırlanıyor','tamamlandı','imzalandı','onaylandı','sertifika_gönderildi'];
-    const SERT_ASAMALAR = ['hazırlanıyor','imzalandı','onaylandı','sertifika_gönderildi'];
+    const SERT_ASAMALAR = ['hazırlanıyor','tamamlandı','imzalandı','onaylandı','sertifika_gönderildi'];
     const SERT_ASAMA_LABEL = {
-        'hazırlanıyor':'Hazırlanıyor', 'imzalandı':'İmzalandı',
-        'onaylandı':'Onaylandı', 'sertifika_gönderildi':'Sertifika Gönderildi'
+        'hazırlanıyor':'Hazırlanıyor', 'tamamlandı':'Tamamlandı',
+        'imzalandı':'İmzalandı', 'onaylandı':'Onaylandı',
+        'sertifika_gönderildi':'Sertifika Gönderildi'
     };
 
     let tumIsEmirleri = [], filtreliIE = [];
@@ -599,7 +620,18 @@
 
     function showToast(msg, err=false) {
         const t=document.getElementById("toast"); t.textContent=msg;
-        t.className=err?"show error":"show"; setTimeout(()=>t.className="",3000);
+        t.className=err?"show error":"show"; setTimeout(()=>t.className="",3500);
+    }
+
+    function showConfirm(msg) {
+        return new Promise(resolve => {
+            const el  = document.getElementById('confirmToast');
+            document.getElementById('confirmToastMsg').textContent = msg;
+            el.classList.add('show');
+            const done = val => { el.classList.remove('show'); resolve(val); };
+            document.getElementById('confirmToastYes').onclick = () => done(true);
+            document.getElementById('confirmToastNo').onclick  = () => done(false);
+        });
     }
 
     // ── SEKME ──
@@ -1208,7 +1240,7 @@
 
             // Dropdown içindeki aşamaya göre öğeler
             let dropItems = `<div class="act-drop-item" onclick="tamOnizle(${s.id});menuKapat()">👁️ Sertifika Önizle</div>`;
-            dropItems += `<div class="act-drop-item" onclick="sertDuzenle(${s.id});menuKapat()">✏️ Düzenle</div>`;
+            if(yetkiVar('operasyon_duzenle')) dropItems += `<div class="act-drop-item" onclick="sertDuzenle(${s.id});menuKapat()">✏️ Düzenle</div>`;
             if(asama==='hazırlanıyor' && pdfVar) {
                 dropItems += `<div class="act-drop-item" onclick="tekliImzala(${s.id});menuKapat()">✍️ İmzala</div>`;
             }
@@ -1219,7 +1251,7 @@
                 dropItems += `<div class="act-drop-item" onclick="tekliMail(${s.id});menuKapat()">📧 Sertifika Mail Gönder</div>`;
             }
             dropItems += `<hr><div class="act-drop-item" onclick="uygunsuzlukForm(${s.id});menuKapat()">⚠️ Uygunsuzluk</div>`;
-            dropItems += `<div class="act-drop-item danger" onclick="icerikTemizle(${s.id});menuKapat()" title="Sertifikayı siler">🗑️ Temizle</div>`;
+            if(yetkiVar('operasyon_sil')) dropItems += `<div class="act-drop-item danger" onclick="icerikTemizle(${s.id});menuKapat()" title="Sertifikayı siler">🗑️ Temizle</div>`;
 
             const butonlar = `${olcumPdfBtn}<div class="act-wrap" id="am-${s.id}"><button class="act-btn" onclick="menuToggle(${s.id},event)">İşlemler ▾</button><div class="act-drop">${dropItems}</div></div>`;
 
@@ -1267,13 +1299,16 @@
         // Aşamaya göre buton görünürlüğü
         const asama = document.getElementById("s_filtre_asama")?.value || "";
         const hazir = asama === "hazırlanıyor";
+        const tamamlandi = asama === "tamamlandı";
         const imzali = asama === "imzalandı";
         const onayliSec = asama === "onaylandı";
+        document.getElementById("btnTopluPdfYukle").style.display = hazir ? "" : "none";
         document.getElementById("btnTopluKDNo").style.display   = hazir ? "" : "none";
         document.getElementById("btnTopluAkrNo").style.display  = hazir ? "" : "none";
-        document.getElementById("btnTopluImzala").style.display = hazir ? "" : "none";
+        document.getElementById("btnTopluImzala").style.display = tamamlandi ? "" : "none";
         document.getElementById("btnTopluOnayla").style.display = imzali ? "" : "none";
-        document.getElementById("btnTopluMail").style.display   = onayliSec ? "" : "none";
+        document.getElementById("btnTopluMail").style.display       = onayliSec ? "" : "none";
+        document.getElementById("btnTopluTbdsAktif").style.display  = onayliSec ? "" : "none";
     }
 
     function secilenIdler() {
@@ -1417,8 +1452,11 @@
 
     // ── TOPLU İŞLEMLER ──
     async function topluImzala() {
-        const idler = secilenIdler();
-        if(!idler.length) return showToast("❌ Sertifika seçin!", true);
+        const idler = secilenIdler().filter(id => {
+            const s = tumSertifikalar.find(x=>x.id===id);
+            return s && (s.asama||'hazırlanıyor') === 'tamamlandı';
+        });
+        if(!idler.length) return showToast("❌ Tamamlandı aşamasında sertifika seçin!", true);
         const pdfsiz = idler.filter(id => !tumSertifikalar.find(s=>s.id===id)?.olcum_pdf_var);
         const nosuz  = idler.filter(id => !tumSertifikalar.find(s=>s.id===id)?.sertifika_no);
         if(pdfsiz.length) return showToast(`❌ ${pdfsiz.length} sertifikada ölçüm PDF'i eksik!`, true);
@@ -1488,7 +1526,7 @@
             showToast('❌ Bu fişe ait onaylanmış sertifika yok!', true);
             return;
         }
-        if(!confirm(`${ie.ie_no} fişine ait ${fişSertler.length} onaylanmış sertifika mail gönderilecek. Onaylıyor musunuz?`)) return;
+        if(!await showConfirm(`${ie.ie_no} fişine ait ${fişSertler.length} onaylanmış sertifika mail gönderilecek. Onaylıyor musunuz?`)) return;
         const res = await fetch('/api/sertifika-mail-toplu', {
             method:'POST', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({idler: fişSertler.map(s=>s.id)})
@@ -1511,7 +1549,7 @@
             .filter(s => fisNolar.includes(s.fis_no) && s.asama === 'onaylandı')
             .map(s => s.id);
         if(!tumFisIdler.length) return showToast("❌ Onaylanmış sertifika bulunamadı!", true);
-        if(!confirm(`${fisNolar.join(', ')} fiş no'larına ait ${tumFisIdler.length} sertifika mail gönderilecek. Onaylıyor musunuz?`)) return;
+        if(!await showConfirm(`${fisNolar.join(', ')} fiş no'larına ait ${tumFisIdler.length} sertifika mail gönderilecek. Onaylıyor musunuz?`)) return;
         const res = await fetch('/api/sertifika-mail-toplu', {
             method:'POST', headers:{'Content-Type':'application/json'},
             body:JSON.stringify({idler: tumFisIdler})
@@ -1529,7 +1567,7 @@
         // Sadece hazırlanıyor aşamasındakiler
         const uygunlar = idler.filter(id => tumSertifikalar.find(s=>s.id===id)?.asama === 'hazırlanıyor');
         if(!uygunlar.length) return showToast('❌ Seçilen sertifikalar hazırlanıyor aşamasında değil!', true);
-        if(!confirm(`${uygunlar.length} sertifikaya sırasıyla kapsam dışı numara verilecek. Onaylıyor musunuz?`)) return;
+        if(!await showConfirm(`${uygunlar.length} sertifikaya sırasıyla kapsam dışı numara verilecek. Onaylıyor musunuz?`)) return;
 
         let basarili = 0;
         for(const id of uygunlar) {
@@ -1561,7 +1599,7 @@
         return showToast('❌ Hazırlanıyor aşamasında akredite sertifika seçin!', true);
     }
 
-    if (!confirm(`${uygunlar.length} akredite sertifika için TÜRKAK / TBDS numarası alınacak. Onaylıyor musunuz?`)) {
+    if (!await showConfirm(`${uygunlar.length} akredite sertifika için TÜRKAK / TBDS numarası alınacak. Onaylıyor musunuz?`)) {
         return;
     }
 
@@ -1605,6 +1643,112 @@
 }
 
     
+
+    async function topluPdfEslestirVeYukle() {
+        const dosyalar = [...document.getElementById('topluPdfInput').files];
+        document.getElementById('topluPdfInput').value = '';
+        if(!dosyalar.length) return;
+
+        const normalize = s => s.toLowerCase()
+            .replace(/\.pdf$/i,'')
+            .replace(/[\/\\\-_]/g,' ')
+            .replace(/\s+/g,' ')
+            .trim();
+
+        const hazirSertler = tumSertifikalar.filter(s => (s.asama||'hazırlanıyor') === 'hazırlanıyor');
+
+        const eslesme   = [];
+        const eslesmedi = [];
+
+        for(const dosya of dosyalar) {
+            const dosyaNorm = normalize(dosya.name);
+            const sert = hazirSertler.find(s => s.sertifika_no && normalize(s.sertifika_no) === dosyaNorm);
+            if(sert) eslesme.push({ sertId: sert.id, dosya });
+            else     eslesmedi.push(dosya.name);
+        }
+
+        if(!eslesme.length) {
+            return showToast(`❌ Hiçbir dosya eşleşmedi! (${dosyalar.length} dosya kontrol edildi)`, true);
+        }
+
+        const onayMesaj = `${eslesme.length} sertifikaya PDF yüklenecek${eslesmedi.length ? ', ' + eslesmedi.length + ' dosya eşleşmedi' : ''}. Devam edilsin mi?`;
+        if(!await showConfirm(onayMesaj)) return;
+
+        let basarili = 0, hatali = 0;
+        const btn = document.getElementById('btnTopluPdfYukle');
+        btn.disabled = true;
+
+        for(const { sertId, dosya } of eslesme) {
+            showToast(`📤 Yükleniyor... (${basarili + hatali + 1}/${eslesme.length})`);
+            try {
+                const base64 = await new Promise((res, rej) => {
+                    const r = new FileReader();
+                    r.onload  = e => res(e.target.result.split(',')[1]);
+                    r.onerror = rej;
+                    r.readAsDataURL(dosya);
+                });
+                const pdfData = atob(base64);
+                const pdfArr  = new Uint8Array(pdfData.length);
+                for(let i = 0; i < pdfData.length; i++) pdfArr[i] = pdfData.charCodeAt(i);
+                const pdfDoc  = await pdfjsLib.getDocument({ data: pdfArr }).promise;
+                const sayfa   = pdfDoc.numPages;
+
+                const resp = await fetch(`/api/sertifikalar/${sertId}/olcum-pdf`, {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ pdf_base64: base64, sayfa_sayisi: sayfa })
+                });
+                if(resp.ok) basarili++; else hatali++;
+            } catch(e) { hatali++; }
+        }
+
+        btn.disabled = false;
+        await sertYukle();
+
+        let msg = `✅ ${basarili} PDF yüklendi`;
+        if(hatali)          msg += `, ${hatali} yükleme hatası`;
+        if(eslesmedi.length) msg += `, ${eslesmedi.length} dosya eşleşmedi`;
+        showToast(msg, hatali > 0);
+    }
+
+    async function topluTbdsAktif() {
+        const idler = secilenIdler();
+        if (!idler.length) return showToast('❌ Sertifika seçin!', true);
+
+        const uygunlar = idler.filter(id => {
+            const s = tumSertifikalar.find(x => String(x.id) === String(id));
+            return s && s.asama === 'onaylandı' && s.turkak_id;
+        });
+
+        if (!uygunlar.length) {
+            return showToast('❌ TBDS numarası alınmış ve onaylandı aşamasındaki sertifika seçin!', true);
+        }
+
+        if (!await showConfirm(`${uygunlar.length} sertifikanın TBDS durumu güncellenecek. Onaylıyor musunuz?`)) return;
+
+        const btn = document.getElementById('btnTopluTbdsAktif');
+        btn.disabled = true; btn.textContent = '⏳ TBDS...';
+
+        try {
+            const res = await fetch('/api/turkak/sertifika-aktif-et', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idler: uygunlar })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Hata');
+
+            let mesaj = `✅ ${data.aktif} sertifika Aktif`;
+            if (data.taslak) mesaj += `, ${data.taslak} hâlâ Taslak`;
+            if (data.hatali) mesaj += `, ${data.hatali} hatalı`;
+            showToast(mesaj + '!');
+            await sertYukle();
+        } catch(e) {
+            showToast('❌ ' + e.message, true);
+        } finally {
+            btn.disabled = false; btn.textContent = '✅ TBDS Aktif Et';
+        }
+    }
 
     async function topluMail() {
         const idler = secilenIdler();
@@ -1985,7 +2129,7 @@
         const s = tumSertifikalar.find(x=>x.id===id);
         const cihazAdi = s?.cihaz_adi || 'bu sertifika';
         const ieId = s?.ie_id;
-        if(!confirm(`"${cihazAdi}" sertifikası silinecek ve iş emrinde tekrar oluşturulabilecek. Emin misiniz?`)) return;
+        if(!await showConfirm(`"${cihazAdi}" sertifikası silinecek ve iş emrinde tekrar oluşturulabilecek. Emin misiniz?`)) return;
         const res = await fetch(`/api/sertifikalar/${id}`, {method:'DELETE'});
         if(res.ok) {
             showToast('🗑️ Sertifika temizlendi, iş emrinde tekrar oluşturulabilir.');

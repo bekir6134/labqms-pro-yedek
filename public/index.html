@@ -74,45 +74,45 @@
             <div id="sidebarLabAdi" style="font-size:0.72rem; font-weight:500; color:#60A5FA; letter-spacing:0.3px; opacity:0.85; display:none;"></div>
         </div>
         <div class="sidebar-menu">
-            <a href="dashboard.html" target="ekran" class="menu-item active" onclick="aktifYap(this)"><span>📊</span> Dashboard</a>
-            <a href="musteriler.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>🏢</span> Müşteriler (CRM)</a>
-            <a href="teklif.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>📄</span> Teklif ve Fiyatlar</a>
-            <a href="referans-cihazlar.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>📏</span> Referans Cihazlar</a>
-            <a href="kabul.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>📥</span> Cihaz Kabul</a>
-            <a href="operasyon.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>🔄</span> Operasyon Merkezi</a>
-            <a href="metotlar.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>🧪</span> Kalibrasyon Metotları</a>
-            <a href="musteri-cihazlari.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>📱</span> Müşteri Cihazları</a>
+            <a href="dashboard.html" target="ekran" class="menu-item active" data-izin="dashboard" onclick="aktifYap(this)"><span>📊</span> Dashboard</a>
+            <a href="musteriler.html" target="ekran" class="menu-item" data-izin="musteriler" onclick="aktifYap(this)"><span>🏢</span> Müşteriler (CRM)</a>
+            <a href="teklif.html" target="ekran" class="menu-item" data-izin="teklif" onclick="aktifYap(this)"><span>📄</span> Teklif ve Fiyatlar</a>
+            <a href="referans-cihazlar.html" target="ekran" class="menu-item" data-izin="referans" onclick="aktifYap(this)"><span>📏</span> Referans Cihazlar</a>
+            <a href="kabul.html" target="ekran" class="menu-item" data-izin="kabul" onclick="aktifYap(this)"><span>📥</span> Cihaz Kabul</a>
+            <a href="operasyon.html" target="ekran" class="menu-item" data-izin="operasyon" onclick="aktifYap(this)"><span>🔄</span> Operasyon Merkezi</a>
+            <a href="metotlar.html" target="ekran" class="menu-item" data-izin="metotlar" onclick="aktifYap(this)"><span>🧪</span> Kalibrasyon Metotları</a>
+            <a href="musteri-cihazlari.html" target="ekran" class="menu-item" data-izin="musteri_cihazlari" onclick="aktifYap(this)"><span>📱</span> Müşteri Cihazları</a>
 
-            <hr class="menu-divider">
+            <hr class="menu-divider" id="anaMenuDivider">
 
             <!-- YÖNETİCİ PANELİ - ALT MENÜ -->
-            <div class="menu-group-header" onclick="toggleSubmenu()">
+            <div class="menu-group-header" id="adminGrupBaslik" onclick="toggleSubmenu()">
                 <span style="display:flex; align-items:center; gap:12px;"><span>⚙️</span> Yönetici Paneli</span>
                 <span class="arrow" id="adminArrow">▼</span>
             </div>
             <div class="submenu" id="adminSubmenu">
-                <a href="kategoriler.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>📁</span> Kategori Yönetimi</a>
-                <a href="cihaz-kutuphanesi.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>🗂️</span> Cihaz Kütüphanesi</a>
-                <a href="talimatlar.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>📜</span> Kalibrasyon Talimatları</a>
-                <a href="cevre-kosullari.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>🌡️</span> Çevre Koşulları</a>
-                <a href="personel.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>👤</span> Personel ve Yetkiler</a>
-                <a href="ayarlar.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>🔧</span> Sistem Ayarları</a>
+                <a href="kategoriler.html" target="ekran" class="menu-item" data-izin="kategoriler" onclick="aktifYap(this)"><span>📁</span> Kategori Yönetimi</a>
+                <a href="cihaz-kutuphanesi.html" target="ekran" class="menu-item" data-izin="cihaz_kutuphanesi" onclick="aktifYap(this)"><span>🗂️</span> Cihaz Kütüphanesi</a>
+                <a href="talimatlar.html" target="ekran" class="menu-item" data-izin="talimatlar" onclick="aktifYap(this)"><span>📜</span> Kalibrasyon Talimatları</a>
+                <a href="cevre-kosullari.html" target="ekran" class="menu-item" data-izin="cevre" onclick="aktifYap(this)"><span>🌡️</span> Çevre Koşulları</a>
+                <a href="personel.html" target="ekran" class="menu-item" data-izin="personel" onclick="aktifYap(this)"><span>👤</span> Personel ve Yetkiler</a>
+                <a href="ayarlar.html" target="ekran" class="menu-item" data-izin="ayarlar" onclick="aktifYap(this)"><span>🔧</span> Sistem Ayarları</a>
             </div>
 
             <!-- KALİTE SİSTEMİ - ALT MENÜ -->
-            <div class="menu-group-header" onclick="toggleKaliteSubmenu()">
+            <div class="menu-group-header" id="kaliteGrupBaslik" onclick="toggleKaliteSubmenu()">
                 <span style="display:flex; align-items:center; gap:12px;"><span>🏅</span> Kalite Sistemi</span>
                 <span class="arrow" id="kaliteArrow">▼</span>
             </div>
             <div class="submenu" id="kaliteSubmenu">
-                <a href="kalite-dokuman.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>📂</span> Doküman Yönetimi</a>
-                <a href="uygunsuzluk.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>⚠️</span> Uygunsuzluk & DÖF</a>
-                <a href="ic-denetim.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>🔍</span> İç Denetim</a>
-                <a href="risk-kaydi.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>📊</span> Risk & Fırsat</a>
-                <a href="musteri-sikayet.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>💬</span> Müşteri Şikayeti</a>
-                <a href="dis-tedarikci.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>🤝</span> Dış Tedarikçi</a>
-                <a href="yeterlilik-testi.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>🧪</span> Yeterlilik Testi</a>
-                <a href="ygg.html" target="ekran" class="menu-item" onclick="aktifYap(this)"><span>📋</span> Yön. Gözden Geçirme</a>
+                <a href="kalite-dokuman.html" target="ekran" class="menu-item" data-izin="kalite_dokuman" onclick="aktifYap(this)"><span>📂</span> Doküman Yönetimi</a>
+                <a href="uygunsuzluk.html" target="ekran" class="menu-item" data-izin="uygunsuzluk" onclick="aktifYap(this)"><span>⚠️</span> Uygunsuzluk & DÖF</a>
+                <a href="ic-denetim.html" target="ekran" class="menu-item" data-izin="ic_denetim" onclick="aktifYap(this)"><span>🔍</span> İç Denetim</a>
+                <a href="risk-kaydi.html" target="ekran" class="menu-item" data-izin="risk" onclick="aktifYap(this)"><span>📊</span> Risk & Fırsat</a>
+                <a href="musteri-sikayet.html" target="ekran" class="menu-item" data-izin="musteri_sikayet" onclick="aktifYap(this)"><span>💬</span> Müşteri Şikayeti</a>
+                <a href="dis-tedarikci.html" target="ekran" class="menu-item" data-izin="dis_tedarikci" onclick="aktifYap(this)"><span>🤝</span> Dış Tedarikçi</a>
+                <a href="yeterlilik-testi.html" target="ekran" class="menu-item" data-izin="yeterlilik" onclick="aktifYap(this)"><span>🧪</span> Yeterlilik Testi</a>
+                <a href="ygg.html" target="ekran" class="menu-item" data-izin="ygg" onclick="aktifYap(this)"><span>📋</span> Yön. Gözden Geçirme</a>
             </div>
         </div>
     </aside>
@@ -207,7 +207,40 @@
             }
         }
 
-        window.onload = () => { labAdiniYukle(); topbarKullaniciGoster(); };
+        function menuYetkileriUygula() {
+            const kullanici = JSON.parse(localStorage.getItem("labqms_user") || '{}');
+            const erisimler = kullanici.erisimler || [];
+
+            // Her menü öğesini izin listesiyle karşılaştır
+            document.querySelectorAll('.menu-item[data-izin]').forEach(item => {
+                const izin = item.getAttribute('data-izin');
+                if (!erisimler.includes(izin)) {
+                    item.style.display = 'none';
+                }
+            });
+
+            // Yönetici Paneli: hiç görünür öğe yoksa başlığı ve grubu gizle
+            const adminGorunen = Array.from(document.querySelectorAll('#adminSubmenu .menu-item')).some(i => i.style.display !== 'none');
+            if (!adminGorunen) {
+                document.getElementById('adminGrupBaslik').style.display = 'none';
+                document.getElementById('adminSubmenu').style.display = 'none';
+            }
+
+            // Kalite Sistemi: hiç görünür öğe yoksa başlığı ve grubu gizle
+            const kaliteGorunen = Array.from(document.querySelectorAll('#kaliteSubmenu .menu-item')).some(i => i.style.display !== 'none');
+            if (!kaliteGorunen) {
+                document.getElementById('kaliteGrupBaslik').style.display = 'none';
+                document.getElementById('kaliteSubmenu').style.display = 'none';
+            }
+
+            // Ana menü öğelerinin tümü gizliyse ayracı da gizle
+            const anaGorunen = Array.from(document.querySelectorAll('.sidebar-menu > .menu-item[data-izin]')).some(i => i.style.display !== 'none');
+            if (!anaGorunen) {
+                document.getElementById('anaMenuDivider').style.display = 'none';
+            }
+        }
+
+        window.onload = () => { labAdiniYukle(); topbarKullaniciGoster(); menuYetkileriUygula(); };
     </script>
 </body>
 </html>

@@ -175,8 +175,8 @@ function renderListe(data){
                 <div class="act-wrap" id="am-${r.id}">
                     <button class="act-btn" onclick="menuToggle(${r.id},event)">İşlemler ▾</button>
                     <div class="act-drop">
-                        <div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>
-                        <div class="act-drop-item danger" onclick="sil(${r.id});menuKapat()">🗑️ Sil</div>
+                        ${yetkiVar('musteri_sikayet_duzenle') ? `<div class="act-drop-item" onclick="duzenle(${r.id});menuKapat()">✏️ Düzenle</div>` : ''}
+                        ${yetkiVar('musteri_sikayet_sil') ? `<div class="act-drop-item danger" onclick="sil(${r.id});menuKapat()">🗑️ Sil</div>` : ''}
                     </div>
                 </div>
             </td>

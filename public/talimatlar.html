@@ -117,8 +117,8 @@
                         <div class="act-wrap" id="am-${t.id}">
                             <button class="act-btn" onclick="menuToggle(${t.id},event)">İşlemler ▾</button>
                             <div class="act-drop">
-                                <div class="act-drop-item" onclick="duzenle(${t.id},'${t.talimat_adi.replace(/'/g,"\\'")}','${t.talimat_kodu.replace(/'/g,"\\'")}','${(t.olcme_araligi||'').replace(/'/g,"\\'")}');menuKapat()">✏️ Düzenle</div>
-                                <div class="act-drop-item danger" onclick="sil(${t.id});menuKapat()">🗑️ Sil</div>
+                                ${yetkiVar('talimatlar_duzenle') ? `<div class="act-drop-item" onclick="duzenle(${t.id},'${t.talimat_adi.replace(/'/g,"\\'")}','${t.talimat_kodu.replace(/'/g,"\\'")}','${(t.olcme_araligi||'').replace(/'/g,"\\'")}');menuKapat()">✏️ Düzenle</div>` : ''}
+                                ${yetkiVar('talimatlar_sil') ? `<div class="act-drop-item danger" onclick="sil(${t.id});menuKapat()">🗑️ Sil</div>` : ''}
                             </div>
                         </div>
                     </td>

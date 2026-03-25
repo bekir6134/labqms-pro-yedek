@@ -284,8 +284,8 @@
                                 <div class="act-drop-item" onclick="event.stopPropagation();panelAc('KAL',${r.id},'${r.cihaz_adi}');menuKapat()">📅 Kalibrasyon</div>
                                 <div class="act-drop-item" onclick="event.stopPropagation();panelAc('ARA',${r.id},'${r.cihaz_adi}');menuKapat()">🔍 Ara Kontrol</div>
                                 <hr>
-                                <div class="act-drop-item" onclick="event.stopPropagation();cihazDuzenle(${JSON.stringify(r).replace(/"/g,'&quot;')});menuKapat()">✏️ Düzenle</div>
-                                <div class="act-drop-item danger" onclick="event.stopPropagation();cihazSil(${r.id});menuKapat()">🗑️ Sil</div>
+                                ${yetkiVar('referans_duzenle') ? `<div class="act-drop-item" onclick="event.stopPropagation();cihazDuzenle(${JSON.stringify(r).replace(/"/g,'&quot;')});menuKapat()">✏️ Düzenle</div>` : ''}
+                                ${yetkiVar('referans_sil') ? `<div class="act-drop-item danger" onclick="event.stopPropagation();cihazSil(${r.id});menuKapat()">🗑️ Sil</div>` : ''}
                             </div>
                         </div>
                     </td>
